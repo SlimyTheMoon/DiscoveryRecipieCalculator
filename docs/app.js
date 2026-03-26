@@ -570,8 +570,7 @@
             categorySelect.appendChild(opt);
         }
 
-        // Faction filter
-        var factionSelect = document.getElementById('faction-filter');
+        // Build faction entries list for autocomplete
         if (siteData.factions) {
             var entries = [];
             for (var key in siteData.factions) {
@@ -580,12 +579,9 @@
                 }
             }
             entries.sort(function(a, b) { return a[1].localeCompare(b[1]); });
-            for (var k = 0; k < entries.length; k++) {
-                var fopt = document.createElement('option');
-                fopt.value = entries[k][0];
-                fopt.textContent = entries[k][1];
-                factionSelect.appendChild(fopt);
-            }
+            siteData._factionEntries = entries;
+        } else {
+            siteData._factionEntries = [];
         }
 
         document.getElementById('total-count').textContent = siteData.recipes.length;
@@ -618,12 +614,104 @@
                 document.getElementById('source-filter').addEventListener('change', applyFilters);
                 document.getElementById('category-filter').addEventListener('change', applyFilters);
                 document.getElementById('search-input').addEventListener('input', applyFilters);
-                document.getElementById('faction-filter').addEventListener('change', function() {
-                    var label = document.getElementById('faction-only-label');
-                    var sel = document.getElementById('faction-filter').value;
-                    label.style.display = (sel && sel !== 'none') ? '' : 'none';
-                    applyFilters();
-                });
+                // Faction autocomplete
+                (function() {
+                    var fInput = document.getElementById('faction-search');
+                    var fHidden = document.getElementById('faction-filter');
+                    var fDropdown = document.getElementById('faction-dropdown');
+                    var fClear = document.getElementById('faction-clear');
+                    var fLabel = document.getElementById('faction-only-label');
+                    var hlIdx = -1;
+
+                    function getFiltered(term) {
+                        var all = siteData._factionEntries || [];
+                        if (!term) return all;
+                        var lower = term.toLowerCase();
+                        return all.filter(function(e) { return e[1].toLowerCase().indexOf(lower) !== -1; });
+                    }
+
+                    function renderDropdown(items) {
+                        hlIdx = -1;
+                        if (items.length === 0) {
+                            fDropdown.innerHTML = '<div class="faction-dropdown-empty">No factions found</div>';
+                        } else {
+                            fDropdown.innerHTML = items.map(function(e, i) {
+                                return '<div class="faction-dropdown-item" data-fkey="' + e[0] + '" data-idx="' + i + '">' + escapeHtml(e[1]) + '</div>';
+                            }).join('');
+                        }
+                        fDropdown.classList.add('open');
+                    }
+
+                    function selectFaction(key, name) {
+                        fHidden.value = key;
+                        fInput.value = name;
+                        fDropdown.classList.remove('open');
+                        fClear.style.display = '';
+                        fLabel.style.display = (key && key !== 'none') ? '' : 'none';
+                        applyFilters();
+                    }
+
+                    function clearFaction() {
+                        fHidden.value = 'none';
+                        fInput.value = '';
+                        fClear.style.display = 'none';
+                        fDropdown.classList.remove('open');
+                        fLabel.style.display = 'none';
+                        document.getElementById('faction-only-filter').checked = false;
+                        applyFilters();
+                    }
+
+                    fInput.addEventListener('focus', function() {
+                        renderDropdown(getFiltered(fInput.value));
+                    });
+
+                    fInput.addEventListener('input', function() {
+                        if (fHidden.value !== 'none') {
+                            fHidden.value = 'none';
+                            fClear.style.display = 'none';
+                            fLabel.style.display = 'none';
+                            applyFilters();
+                        }
+                        renderDropdown(getFiltered(fInput.value));
+                    });
+
+                    fInput.addEventListener('keydown', function(e) {
+                        var items = fDropdown.querySelectorAll('.faction-dropdown-item');
+                        if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            hlIdx = Math.min(hlIdx + 1, items.length - 1);
+                            items.forEach(function(el, i) { el.classList.toggle('highlighted', i === hlIdx); });
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            hlIdx = Math.max(hlIdx - 1, 0);
+                            items.forEach(function(el, i) { el.classList.toggle('highlighted', i === hlIdx); });
+                        } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (hlIdx >= 0 && hlIdx < items.length) {
+                                selectFaction(items[hlIdx].getAttribute('data-fkey'), items[hlIdx].textContent);
+                            }
+                        } else if (e.key === 'Escape') {
+                            fDropdown.classList.remove('open');
+                            fInput.blur();
+                        }
+                    });
+
+                    fDropdown.addEventListener('mousedown', function(e) {
+                        var item = e.target.closest('.faction-dropdown-item');
+                        if (item) {
+                            e.preventDefault();
+                            selectFaction(item.getAttribute('data-fkey'), item.textContent);
+                        }
+                    });
+
+                    fClear.addEventListener('click', clearFaction);
+
+                    document.addEventListener('click', function(e) {
+                        if (!e.target.closest('.faction-autocomplete')) {
+                            fDropdown.classList.remove('open');
+                        }
+                    });
+                })();
                 document.getElementById('faction-only-filter').addEventListener('change', applyFilters);
 
                 // Toggle button delegation

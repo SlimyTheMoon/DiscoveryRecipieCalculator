@@ -38,10 +38,13 @@ const indexHTML = `<!DOCTYPE html>
             </div>
 
             <div class="filter-group">
-                <label for="faction-filter">Affiliation Bonus:</label>
-                <select id="faction-filter">
-                    <option value="none">No faction selected</option>
-                </select>
+                <label for="faction-search">Affiliation Bonus:</label>
+                <div class="faction-autocomplete">
+                    <input type="text" id="faction-search" placeholder="Search factions..." autocomplete="off">
+                    <input type="hidden" id="faction-filter" value="none">
+                    <button type="button" id="faction-clear" class="faction-clear-btn" style="display:none" title="Clear selection">&times;</button>
+                    <div id="faction-dropdown" class="faction-dropdown"></div>
+                </div>
                 <label class="faction-only-label" id="faction-only-label" style="display:none">
                     <input type="checkbox" id="faction-only-filter"> Only with bonus
                 </label>

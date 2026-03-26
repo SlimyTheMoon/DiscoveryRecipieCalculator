@@ -78,6 +78,74 @@ main {
     letter-spacing: 0.05em;
 }
 
+/* Faction autocomplete */
+.faction-autocomplete {
+    position: relative;
+    min-width: 220px;
+}
+
+.faction-autocomplete input[type="text"] {
+    width: 100%;
+    padding-right: 2rem;
+}
+
+.faction-clear-btn {
+    position: absolute;
+    right: 0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    line-height: 1;
+}
+
+.faction-clear-btn:hover {
+    color: var(--text-primary);
+}
+
+.faction-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.faction-dropdown.open {
+    display: block;
+}
+
+.faction-dropdown-item {
+    padding: 0.45rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.faction-dropdown-item:hover,
+.faction-dropdown-item.highlighted {
+    background: var(--bg-secondary);
+    color: var(--accent);
+}
+
+.faction-dropdown-empty {
+    padding: 0.45rem 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
 .faction-only-label {
     display: inline-flex;
     align-items: center;
