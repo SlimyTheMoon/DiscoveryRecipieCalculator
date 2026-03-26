@@ -6,7 +6,7 @@ COPY go.mod ./
 COPY *.go ./
 COPY sources/ ./sources/
 
-RUN go build -o recipe-calc .
+RUN CGO_ENABLED=0 go build -o recipe-calc .
 
 RUN ./recipe-calc build
 
