@@ -13,7 +13,8 @@ A static site generator and crafting calculator for [Discovery Freelancer](https
 - **"Only with bonus" filter** — when a faction is selected, toggle to show only recipes that faction has a bonus on
 - **Per Batch / 24 Hours toggle** — switch between per-batch and 24-hour production views (items only, not modules)
 - **Profit calculator** — per-item buy/sell price inputs with real-time cost, revenue, and margin calculation; updates with batch/24h mode and affiliation bonuses
-- **Cooking time calculation** — `total consumed units ÷ cooking rate (units/min)` with formula breakdown and material proportion bar
+- **Cooking time calculation** — `total consumed volume ÷ cooking rate (vol/min)` with formula breakdown and material proportion bar
+- **Real commodity names** — item names sourced from game data (`select_equip.ini`) instead of auto-generated from internal nicknames
 - Supports consumed items, dynamic alternatives (OR choices), and catalysts
 - Module recipes show produced items resolved from craft lists
 - Dark themed, responsive UI
@@ -30,7 +31,8 @@ A static site generator and crafting calculator for [Discovery Freelancer](https
 ├── sources/         # Game data files
 │   ├── base_recipe_items.cfg
 │   ├── base_recipe_modules.cfg
-│   └── factions.json
+│   ├── factions.json
+│   └── select_equip.ini
 └── docs/            # Generated static site (GitHub Pages)
     ├── index.html
     ├── style.css
@@ -105,11 +107,12 @@ Recipe data is read from the `sources/` directory:
 | `base_recipe_items.cfg` | Equipment recipes (jump drives, cloaks, weapons, shields, etc.) |
 | `base_recipe_modules.cfg` | Base module recipes (factories, refineries, defense, storage, etc.) |
 | `factions.json` | Faction ID to display name mapping |
+| `select_equip.ini` | Commodity definitions — volume per unit and display names |
 
 ## Cooking Time Calculation
 
 Cooking time is calculated as:
 
-$$\text{Time (minutes)} = \frac{\text{Total consumed units}}{\text{Cooking rate (units/min)}}$$
+$$\text{Time (seconds)} = \frac{\sum (\text{quantity} \times \text{volume per unit})}{\text{Cooking rate (vol/min)}} \times 60$$
 
-When a faction affiliation bonus applies, consumed material quantities are reduced by the bonus factor before dividing by the cooking rate, resulting in a shorter cook time.
+Each consumed item's quantity is multiplied by its volume (from `select_equip.ini`) to get the total volume. When a faction affiliation bonus applies, consumed material quantities are reduced by the bonus factor before the calculation, resulting in a shorter cook time.
