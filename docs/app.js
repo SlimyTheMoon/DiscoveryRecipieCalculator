@@ -485,8 +485,8 @@
         // Cooking time section
         var cookingSectionHTML = renderCookingSection(recipe, selectedFaction);
 
-        // Profit calculator section
-        var calcSectionHTML = renderCalcSection(recipe, recipeIdx, mult, affiliationBonus);
+        // Profit calculator section (not for modules)
+        var calcSectionHTML = recipe.source !== 'modules' ? renderCalcSection(recipe, recipeIdx, mult, affiliationBonus) : '';
 
         return '<div class="recipe-card" data-idx="' + recipeIdx + '">' +
             '<div class="recipe-header">' +
