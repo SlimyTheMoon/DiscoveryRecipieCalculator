@@ -80,12 +80,18 @@ main {
 
 /* Faction autocomplete */
 .faction-autocomplete {
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     min-width: 220px;
 }
 
+.faction-input-wrap {
+    position: relative;
+}
+
 .faction-autocomplete input[type="text"] {
-    width: 100%;
+    width: 220px;
     padding-right: 2rem;
 }
 
@@ -101,6 +107,7 @@ main {
     cursor: pointer;
     padding: 0 0.25rem;
     line-height: 1;
+    z-index: 1;
 }
 
 .faction-clear-btn:hover {
@@ -150,12 +157,12 @@ main {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    margin-top: 0.25rem;
     font-size: 0.8rem !important;
     color: var(--text-secondary);
     cursor: pointer;
     text-transform: none !important;
     letter-spacing: normal !important;
+    white-space: nowrap;
 }
 
 .faction-only-label input[type="checkbox"] {
