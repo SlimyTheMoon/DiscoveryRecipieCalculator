@@ -10,9 +10,12 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
     let dailyModeCards = {}; // recipeIndex -> true if 24h mode
     let calcData = {}; // recipeIndex -> { prices: { itemKey: price }, open: bool }
 
-    // Prettify commodity names: "commodity_basic_alloys" -> "Basic Alloys"
+    // Prettify commodity names: use real name from commodityNames, fallback to auto-prettify
     function prettifyName(raw) {
         if (!raw) return raw;
+        if (siteData && siteData.commodityNames && siteData.commodityNames[raw]) {
+            return siteData.commodityNames[raw];
+        }
         return raw
             .replace(/^commodity_/, '')
             .replace(/^dsy_/, '')
