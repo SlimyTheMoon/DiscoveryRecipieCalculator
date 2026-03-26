@@ -331,7 +331,7 @@ select:focus, input:focus {
     border-color: rgba(63,185,80,0.3);
 }
 
-/* Craft Lists */
+/* Produced Items & Craft Lists */
 .craft-lists {
     margin-top: 0.5rem;
     font-size: 0.8rem;
@@ -340,6 +340,55 @@ select:focus, input:focus {
 
 .craft-lists strong {
     color: var(--text-primary);
+}
+
+.produced-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.produced-items-list {
+    list-style: none;
+    margin: 0.15rem 0 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+}
+
+.produced-items-list li {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.produced-items-list li::before {
+    content: '\2022 ';
+    color: var(--accent);
+}
+
+.produced-items {
+    margin-top: 0.75rem;
+}
+
+.produced-items summary {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.produced-items summary:hover {
+    color: var(--accent);
+}
+
+.item-produced {
+    color: var(--accent);
+}
+
+.item-craft-type {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
 }
 
 /* Footer */

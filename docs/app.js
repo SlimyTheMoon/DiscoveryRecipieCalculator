@@ -4,6 +4,7 @@
 
     let siteData = null;
     let filteredRecipes = [];
+    let craftTypeIndex = {}; // craftType -> [recipe, ...]
 
     // Prettify commodity names: "commodity_basic_alloys" -> "Basic Alloys"
     function prettifyName(raw) {
@@ -148,6 +149,25 @@
         return recipe.craftType || recipe.buildType || 'Uncategorized';
     }
 
+    // Render produced items list
+    function renderProducedItems(recipe) {
+        if (!recipe.producedItems || recipe.producedItems.length === 0) return '';
+        if (recipe.producedItems.length === 1) {
+            var p = recipe.producedItems[0];
+            return '<span><span class="meta-label">Produces:</span> ' +
+                escapeHtml(prettifyName(p.item)) +
+                (p.quantity > 1 ? ' x' + formatNumber(p.quantity) : '') + '</span>';
+        }
+        var html = '<div class="produced-list"><span class="meta-label">Produces:</span><ul class="produced-items-list">';
+        for (var i = 0; i < recipe.producedItems.length; i++) {
+            var pi = recipe.producedItems[i];
+            html += '<li>' + escapeHtml(prettifyName(pi.item)) +
+                ' <span class="item-qty">x' + formatNumber(pi.quantity) + '</span></li>';
+        }
+        html += '</ul></div>';
+        return html;
+    }
+
     function escapeHtml(text) {
         var div = document.createElement('div');
         div.appendChild(document.createTextNode(text));
@@ -210,11 +230,37 @@
             affHTML += '</div></details>';
         }
 
-        // Craft lists (for module factories)
-        var craftListHTML = '';
+        // Produced items list (resolved from craftLists for factories, or single item for regular recipes)
+        var producedHTML = '';
         if (recipe.craftLists && recipe.craftLists.length > 0) {
-            craftListHTML = '<div class="craft-lists"><strong>Unlocked crafts:</strong> ' +
-                recipe.craftLists.map(function(x) { return escapeHtml(x); }).join(', ') + '</div>';
+            // Factory module: resolve craft lists to actual producible items
+            var producedItems = [];
+            for (var pi = 0; pi < recipe.craftLists.length; pi++) {
+                var craftType = recipe.craftLists[pi];
+                var matching = craftTypeIndex[craftType];
+                if (matching) {
+                    for (var pj = 0; pj < matching.length; pj++) {
+                        producedItems.push(matching[pj]);
+                    }
+                }
+            }
+            if (producedItems.length > 0) {
+                producedHTML = '<details class="produced-items"><summary>Produced Items (' + producedItems.length + ')</summary>';
+                producedHTML += '<table class="materials-table"><thead><tr><th>Item</th><th>Category</th><th style="text-align:right">Qty</th></tr></thead><tbody>';
+                for (var pk = 0; pk < producedItems.length; pk++) {
+                    var pr = producedItems[pk];
+                    producedHTML += '<tr>';
+                    producedHTML += '<td class="item-produced">' + escapeHtml(pr.infotext) + '</td>';
+                    producedHTML += '<td class="item-craft-type">' + escapeHtml(pr.craftType || '') + '</td>';
+                    producedHTML += '<td class="item-qty">' + (pr.producedQuantity > 1 ? 'x' + pr.producedQuantity : 'x1') + '</td>';
+                    producedHTML += '</tr>';
+                }
+                producedHTML += '</tbody></table></details>';
+            } else {
+                // Fallback: show raw craft list names if no matching recipes found
+                producedHTML = '<div class="craft-lists"><strong>Craft categories:</strong> ' +
+                    recipe.craftLists.map(function(x) { return escapeHtml(x); }).join(', ') + '</div>';
+            }
         }
 
         // Extra meta info
@@ -238,12 +284,11 @@
                 '<span class="recipe-badge ' + badgeClass + '">' + escapeHtml(category) + '</span>' +
             '</div>' +
             '<div class="recipe-meta">' +
-                '<span><span class="meta-label">Produces:</span> ' + escapeHtml(prettifyName(recipe.producedItem)) +
-                (recipe.producedQuantity > 1 ? ' x' + recipe.producedQuantity : '') + '</span>' +
+                renderProducedItems(recipe) +
                 extraMeta +
             '</div>' +
             cookingSectionHTML +
-            materialsHTML + altHTML + catalystHTML + craftListHTML + affHTML +
+            materialsHTML + altHTML + catalystHTML + producedHTML + affHTML +
         '</div>';
     }
 
@@ -263,7 +308,8 @@
             }
 
             if (searchTerm) {
-                var haystack = (r.infotext + ' ' + r.nickname + ' ' + r.producedItem + ' ' +
+                var haystack = (r.infotext + ' ' + r.nickname + ' ' +
+                    (r.producedItems || []).map(function(p) { return p.item; }).join(' ') + ' ' +
                     (r.consumed || []).map(function(c) { return c.item; }).join(' ') + ' ' +
                     (r.craftType || '') + ' ' + (r.buildType || '')).toLowerCase();
                 if (haystack.indexOf(searchTerm) === -1) return false;
@@ -325,12 +371,27 @@
         document.getElementById('total-count').textContent = siteData.recipes.length;
     }
 
+    // Build index: craftType -> list of recipes with that craft type
+    function buildCraftTypeIndex() {
+        craftTypeIndex = {};
+        for (var i = 0; i < siteData.recipes.length; i++) {
+            var r = siteData.recipes[i];
+            if (r.craftType) {
+                if (!craftTypeIndex[r.craftType]) {
+                    craftTypeIndex[r.craftType] = [];
+                }
+                craftTypeIndex[r.craftType].push(r);
+            }
+        }
+    }
+
     // Initialize
     function init() {
         fetch('data.json')
             .then(function(res) { return res.json(); })
             .then(function(data) {
                 siteData = data;
+                buildCraftTypeIndex();
                 populateFilters();
                 applyFilters();
 

@@ -30,27 +30,26 @@ type AffiliationBonus struct {
 }
 
 type Recipe struct {
-	Nickname         string               `json:"nickname"`
-	ProducedItem     string               `json:"producedItem"`
-	ProducedQuantity int                  `json:"producedQuantity"`
-	Infotext         string               `json:"infotext"`
-	ShortcutNumber   int                  `json:"shortcutNumber,omitempty"`
-	CraftType        string               `json:"craftType,omitempty"`
-	BuildType        string               `json:"buildType,omitempty"`
-	CookingRate      int                  `json:"cookingRate"`
-	ReqLevel         int                  `json:"reqLevel"`
-	Consumed         []ConsumedItem       `json:"consumed"`
-	ConsumedAlt      []ConsumedDynamicAlt `json:"consumedAlt,omitempty"`
-	Catalysts        []ConsumedItem       `json:"catalysts,omitempty"`
-	Affiliations     []AffiliationBonus   `json:"affiliations,omitempty"`
-	CreditCost       int                  `json:"creditCost,omitempty"`
-	CargoStorage     int                  `json:"cargoStorage,omitempty"`
-	CraftLists       []string             `json:"craftLists,omitempty"`
-	LoopProduction   int                  `json:"loopProduction,omitempty"`
-	Restricted       bool                 `json:"restricted,omitempty"`
-	ModuleClass      int                  `json:"moduleClass,omitempty"`
-	RecipeNumber     int                  `json:"recipeNumber,omitempty"`
-	Source           string               `json:"source"`
+	Nickname       string               `json:"nickname"`
+	ProducedItems  []ConsumedItem       `json:"producedItems"`
+	Infotext       string               `json:"infotext"`
+	ShortcutNumber int                  `json:"shortcutNumber,omitempty"`
+	CraftType      string               `json:"craftType,omitempty"`
+	BuildType      string               `json:"buildType,omitempty"`
+	CookingRate    int                  `json:"cookingRate"`
+	ReqLevel       int                  `json:"reqLevel"`
+	Consumed       []ConsumedItem       `json:"consumed"`
+	ConsumedAlt    []ConsumedDynamicAlt `json:"consumedAlt,omitempty"`
+	Catalysts      []ConsumedItem       `json:"catalysts,omitempty"`
+	Affiliations   []AffiliationBonus   `json:"affiliations,omitempty"`
+	CreditCost     int                  `json:"creditCost,omitempty"`
+	CargoStorage   int                  `json:"cargoStorage,omitempty"`
+	CraftLists     []string             `json:"craftLists,omitempty"`
+	LoopProduction int                  `json:"loopProduction,omitempty"`
+	Restricted     bool                 `json:"restricted,omitempty"`
+	ModuleClass    int                  `json:"moduleClass,omitempty"`
+	RecipeNumber   int                  `json:"recipeNumber,omitempty"`
+	Source         string               `json:"source"`
 }
 
 type SiteData struct {
@@ -92,7 +91,7 @@ func parseCfgFile(path string, source string) ([]Recipe, error) {
 			if current != nil {
 				recipes = append(recipes, *current)
 			}
-			current = &Recipe{Source: source, ProducedQuantity: 1}
+			current = &Recipe{Source: source}
 			continue
 		}
 
@@ -113,10 +112,14 @@ func parseCfgFile(path string, source string) ([]Recipe, error) {
 			current.Nickname = value
 		case "produced_item":
 			parts := splitCSV(value)
-			current.ProducedItem = parts[0]
+			qty := 1
 			if len(parts) > 1 {
-				current.ProducedQuantity, _ = strconv.Atoi(parts[1])
+				qty, _ = strconv.Atoi(parts[1])
 			}
+			current.ProducedItems = append(current.ProducedItems, ConsumedItem{
+				Item:     parts[0],
+				Quantity: qty,
+			})
 		case "infotext":
 			current.Infotext = value
 		case "shortcut_number":
