@@ -20,39 +20,46 @@
             .replace(/\b\w/g, function(c) { return c.toUpperCase(); });
     }
 
-    // Calculate cooking time details: sum of consumed quantities / cooking_rate
+    // Calculate cooking time details: sum of consumed (quantity * volume) / cooking_rate
     function calcCookingDetails(recipe, affiliationBonus) {
         if (!recipe.cookingRate || recipe.cookingRate === 0) {
-            return { totalUnits: 0, rate: 0, baseTime: null, adjustedTime: null, bonus: null, items: [] };
+            return { totalVolume: 0, rate: 0, baseTime: null, adjustedTime: null, bonus: null, items: [] };
         }
-        var totalUnits = 0;
+        var totalVolume = 0;
         var items = [];
         var bonus = affiliationBonus || 1;
+        var volumes = (siteData && siteData.volumes) || {};
 
         if (recipe.consumed) {
             for (var i = 0; i < recipe.consumed.length; i++) {
                 var qty = recipe.consumed[i].quantity;
-                totalUnits += qty;
-                items.push({ name: recipe.consumed[i].item, quantity: qty, type: 'consumed' });
+                var vol = volumes[recipe.consumed[i].item] || 1;
+                var itemVol = qty * vol;
+                totalVolume += itemVol;
+                items.push({ name: recipe.consumed[i].item, quantity: qty, volume: itemVol, type: 'consumed' });
             }
         }
         if (recipe.consumedAlt) {
             for (var j = 0; j < recipe.consumedAlt.length; j++) {
                 var altQty = recipe.consumedAlt[j].quantity;
-                totalUnits += altQty;
+                var altName = recipe.consumedAlt[j].alternatives[0] || '';
+                var altVol = volumes[altName] || 1;
+                var altItemVol = altQty * altVol;
+                totalVolume += altItemVol;
                 items.push({
                     name: recipe.consumedAlt[j].alternatives.join(' / '),
                     quantity: altQty,
+                    volume: altItemVol,
                     type: 'alt'
                 });
             }
         }
 
-        var baseTime = (totalUnits / recipe.cookingRate) * 60;
-        var adjustedTime = ((totalUnits * bonus) / recipe.cookingRate) * 60;
+        var baseTime = (totalVolume / recipe.cookingRate) * 60;
+        var adjustedTime = ((totalVolume * bonus) / recipe.cookingRate) * 60;
 
         return {
-            totalUnits: totalUnits,
+            totalVolume: totalVolume,
             rate: recipe.cookingRate,
             baseTime: baseTime,
             adjustedTime: bonus < 1 ? adjustedTime : null,
@@ -105,9 +112,9 @@
 
         // Formula
         html += '<div class="cooking-formula">';
-        html += '<span>' + formatNumber(details.totalUnits) + ' units</span>';
+        html += '<span>' + formatNumber(details.totalVolume) + ' vol</span>';
         html += '<span class="cooking-op">&divide;</span>';
-        html += '<span>' + formatNumber(details.rate) + ' units/min</span>';
+        html += '<span>' + formatNumber(details.rate) + ' vol/min</span>';
         html += '<span class="cooking-op">=</span>';
         html += '<span>' + formatTime(details.baseTime) + '</span>';
         html += '</div>';
@@ -122,17 +129,17 @@
         }
 
         // Per-item time bar
-        if (details.items.length > 0 && details.totalUnits > 0) {
+        if (details.items.length > 0 && details.totalVolume > 0) {
             html += '<div class="cooking-breakdown">';
             html += '<div class="cooking-bar">';
             var colors = ['#58a6ff','#3fb950','#d29922','#f85149','#bc8cff','#79c0ff','#f0883e','#a5d6ff','#7ee787','#d2a8ff'];
             for (var i = 0; i < details.items.length; i++) {
                 var item = details.items[i];
-                var pctWidth = (item.quantity / details.totalUnits * 100);
+                var pctWidth = (item.volume / details.totalVolume * 100);
                 if (pctWidth < 0.5) continue;
                 var color = colors[i % colors.length];
                 html += '<div class="cooking-bar-seg" style="width:' + pctWidth.toFixed(1) + '%;background:' + color + '" ';
-                html += 'title="' + escapeHtml(prettifyName(item.name)) + ': ' + formatNumber(item.quantity) + ' (' + pctWidth.toFixed(1) + '%)">';
+                html += 'title="' + escapeHtml(prettifyName(item.name)) + ': ' + formatNumber(item.volume) + ' vol (' + pctWidth.toFixed(1) + '%)">';
                 html += '</div>';
             }
             html += '</div>';

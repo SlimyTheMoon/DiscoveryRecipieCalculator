@@ -53,10 +53,11 @@ type Recipe struct {
 }
 
 type SiteData struct {
-	Recipes    []Recipe          `json:"recipes"`
-	Factions   map[string]string `json:"factions"`
-	CraftTypes []string          `json:"craftTypes"`
-	BuildTypes []string          `json:"buildTypes"`
+	Recipes    []Recipe           `json:"recipes"`
+	Factions   map[string]string  `json:"factions"`
+	CraftTypes []string           `json:"craftTypes"`
+	BuildTypes []string           `json:"buildTypes"`
+	Volumes    map[string]float64 `json:"volumes"`
 }
 
 // --- Parser ---
@@ -220,6 +221,57 @@ func loadFactions(path string) (map[string]string, error) {
 	return factions, nil
 }
 
+func parseVolumes(path string) (map[string]float64, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("opening %s: %w", path, err)
+	}
+	defer file.Close()
+
+	volumes := make(map[string]float64)
+	var nickname string
+	inCommodity := false
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "[") {
+			inCommodity = strings.EqualFold(line, "[Commodity]")
+			nickname = ""
+			continue
+		}
+		if !inCommodity {
+			continue
+		}
+		eqIdx := strings.Index(line, "=")
+		if eqIdx < 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:eqIdx])
+		value := strings.TrimSpace(line[eqIdx+1:])
+		// Strip inline comments
+		if idx := strings.Index(value, ";"); idx >= 0 {
+			value = strings.TrimSpace(value[:idx])
+		}
+		switch key {
+		case "nickname":
+			nickname = value
+		case "volume":
+			if nickname != "" {
+				v, _ := strconv.ParseFloat(value, 64)
+				volumes[nickname] = v
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanning %s: %w", path, err)
+	}
+	return volumes, nil
+}
+
 func collectUniqueStrings(recipes []Recipe, getter func(Recipe) string) []string {
 	seen := make(map[string]bool)
 	var result []string
@@ -255,6 +307,12 @@ func buildSite(sourcesDir, outputDir string) error {
 		return err
 	}
 
+	volumesPath := filepath.Join(sourcesDir, "select_equip.ini")
+	volumes, err := parseVolumes(volumesPath)
+	if err != nil {
+		return err
+	}
+
 	allRecipes := append(itemRecipes, moduleRecipes...)
 
 	craftTypes := collectUniqueStrings(allRecipes, func(r Recipe) string { return r.CraftType })
@@ -265,6 +323,7 @@ func buildSite(sourcesDir, outputDir string) error {
 		Factions:   factions,
 		CraftTypes: craftTypes,
 		BuildTypes: buildTypes,
+		Volumes:    volumes,
 	}
 
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
