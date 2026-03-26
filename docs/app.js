@@ -45,8 +45,8 @@
             }
         }
 
-        var baseTime = totalUnits / recipe.cookingRate;
-        var adjustedTime = (totalUnits * bonus) / recipe.cookingRate;
+        var baseTime = (totalUnits / recipe.cookingRate) * 60;
+        var adjustedTime = ((totalUnits * bonus) / recipe.cookingRate) * 60;
 
         return {
             totalUnits: totalUnits,
@@ -104,7 +104,7 @@
         html += '<div class="cooking-formula">';
         html += '<span>' + formatNumber(details.totalUnits) + ' units</span>';
         html += '<span class="cooking-op">&divide;</span>';
-        html += '<span>' + formatNumber(details.rate) + ' units/s</span>';
+        html += '<span>' + formatNumber(details.rate) + ' units/min</span>';
         html += '<span class="cooking-op">=</span>';
         html += '<span>' + formatTime(details.baseTime) + '</span>';
         html += '</div>';
