@@ -223,7 +223,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
                         var c = recipe.consumed[i];
                         var key = 'buy_' + i;
                         var price = cd.prices[key] || 0;
-                        var adjQty = Math.round(c.quantity * bFactor);
+                        var adjQty = Math.round(c.quantity * bFactor * mult);
                         var lineCost = adjQty * price;
                         totalCost += lineCost;
                         html += '<div class="calc-item-row">';
@@ -237,7 +237,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
                         var a = recipe.consumedAlt[j];
                         var aKey = 'alt_' + j;
                         var aPrice = cd.prices[aKey] || 0;
-                        var adjAltQty = Math.round(a.quantity * bFactor);
+                        var adjAltQty = Math.round(a.quantity * bFactor * mult);
                         var aLineCost = adjAltQty * aPrice;
                         totalCost += aLineCost;
                         var altNames = a.alternatives.map(function(x) { return prettifyName(x); }).join(' / ');
@@ -259,10 +259,11 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
                     var p = recipe.producedItems[k];
                     var pKey = 'sell_' + k;
                     var pPrice = cd.prices[pKey] || 0;
-                    var lineRev = p.quantity * pPrice;
+                    var pQty = Math.round(p.quantity * mult);
+                    var lineRev = pQty * pPrice;
                     totalRevenue += lineRev;
                     html += '<div class="calc-item-row">';
-                    html += '<span class="calc-item-name calc-item-prod">' + escapeHtml(prettifyName(p.item)) + ' <span class="calc-item-qty">x' + formatNumber(p.quantity) + '</span></span>';
+                    html += '<span class="calc-item-name calc-item-prod">' + escapeHtml(prettifyName(p.item)) + ' <span class="calc-item-qty">x' + formatNumber(pQty) + '</span></span>';
                     html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + pKey + '" value="' + (pPrice || '') + '" min="0" step="any" placeholder="0">';
                     html += '</div>';
                 }
@@ -272,9 +273,9 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
             // Results
             var batchProfit = totalRevenue - totalCost;
             var marginPct = totalCost > 0 ? ((batchProfit / totalCost) * 100) : 0;
-            var dCost = Math.round(totalCost * mult);
-            var dRevenue = Math.round(totalRevenue * mult);
-            var dProfit = Math.round(batchProfit * mult);
+            var dCost = Math.round(totalCost);
+            var dRevenue = Math.round(totalRevenue);
+            var dProfit = Math.round(batchProfit);
             var profitCls = dProfit >= 0 ? 'calc-profit-pos' : 'calc-profit-neg';
             var marginStr = totalCost > 0 ? marginPct.toFixed(1) + '%' : '&mdash;';
 
@@ -317,25 +318,25 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         var totalCost = 0;
         if (recipe.consumed) {
             for (var i = 0; i < recipe.consumed.length; i++) {
-                totalCost += Math.round(recipe.consumed[i].quantity * bonus) * (cd.prices['buy_' + i] || 0);
+                totalCost += Math.round(recipe.consumed[i].quantity * bonus * mult) * (cd.prices['buy_' + i] || 0);
             }
         }
         if (recipe.consumedAlt) {
             for (var j = 0; j < recipe.consumedAlt.length; j++) {
-                totalCost += Math.round(recipe.consumedAlt[j].quantity * bonus) * (cd.prices['alt_' + j] || 0);
+                totalCost += Math.round(recipe.consumedAlt[j].quantity * bonus * mult) * (cd.prices['alt_' + j] || 0);
             }
         }
         var totalRevenue = 0;
         if (recipe.producedItems) {
             for (var k = 0; k < recipe.producedItems.length; k++) {
-                totalRevenue += recipe.producedItems[k].quantity * (cd.prices['sell_' + k] || 0);
+                totalRevenue += Math.round(recipe.producedItems[k].quantity * mult) * (cd.prices['sell_' + k] || 0);
             }
         }
         var batchProfit = totalRevenue - totalCost;
         var marginPct = totalCost > 0 ? ((batchProfit / totalCost) * 100) : 0;
-        var dCost = Math.round(totalCost * mult);
-        var dRevenue = Math.round(totalRevenue * mult);
-        var dProfit = Math.round(batchProfit * mult);
+        var dCost = Math.round(totalCost);
+        var dRevenue = Math.round(totalRevenue);
+        var dProfit = Math.round(batchProfit);
         var profitCls = dProfit >= 0 ? 'calc-profit-pos' : 'calc-profit-neg';
         var marginStr = totalCost > 0 ? marginPct.toFixed(1) + '%' : '&mdash;';
         var el = document.querySelector('[data-calc-results="' + idx + '"]');
@@ -530,6 +531,12 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
                 if (haystack.indexOf(searchTerm) === -1) return false;
             }
 
+            // Affiliation-only filter
+            var factionOnlyChk = document.getElementById('faction-only-filter');
+            if (factionFilter && factionFilter !== 'none' && factionOnlyChk && factionOnlyChk.checked) {
+                if (!r.affiliations || !r.affiliations.some(function(a) { return a.faction === factionFilter; })) return false;
+            }
+
             return true;
         });
 
@@ -613,7 +620,13 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
                 document.getElementById('source-filter').addEventListener('change', applyFilters);
                 document.getElementById('category-filter').addEventListener('change', applyFilters);
                 document.getElementById('search-input').addEventListener('input', applyFilters);
-                document.getElementById('faction-filter').addEventListener('change', applyFilters);
+                document.getElementById('faction-filter').addEventListener('change', function() {
+                    var label = document.getElementById('faction-only-label');
+                    var sel = document.getElementById('faction-filter').value;
+                    label.style.display = (sel && sel !== 'none') ? '' : 'none';
+                    applyFilters();
+                });
+                document.getElementById('faction-only-filter').addEventListener('change', applyFilters);
 
                 // Toggle button delegation
                 document.getElementById('recipe-list').addEventListener('click', function(e) {

@@ -42,6 +42,9 @@ const indexHTML = `<!DOCTYPE html>
                 <select id="faction-filter">
                     <option value="none">No faction selected</option>
                 </select>
+                <label class="faction-only-label" id="faction-only-label" style="display:none">
+                    <input type="checkbox" id="faction-only-filter"> Only with bonus
+                </label>
             </div>
 
             <div class="stats" id="stats-bar">

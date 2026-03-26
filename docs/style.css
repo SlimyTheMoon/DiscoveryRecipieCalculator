@@ -76,6 +76,23 @@ main {
     letter-spacing: 0.05em;
 }
 
+.faction-only-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+    font-size: 0.8rem !important;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+}
+
+.faction-only-label input[type="checkbox"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
 select, input[type="text"] {
     background: var(--bg-primary);
     border: 1px solid var(--border);
