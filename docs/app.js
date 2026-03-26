@@ -6,6 +6,7 @@
     let filteredRecipes = [];
     let craftTypeIndex = {}; // craftType -> [recipe, ...]
     let dailyModeCards = {}; // recipeIndex -> true if 24h mode
+    let calcData = {}; // recipeIndex -> { prices: { itemKey: price }, open: bool }
 
     // Prettify commodity names: "commodity_basic_alloys" -> "Basic Alloys"
     function prettifyName(raw) {
@@ -195,6 +196,139 @@
         return div.innerHTML;
     }
 
+    // Render profit calculator section
+    function renderCalcSection(recipe, recipeIdx, mult) {
+        var hasConsumed = (recipe.consumed && recipe.consumed.length > 0) || (recipe.consumedAlt && recipe.consumedAlt.length > 0);
+        var hasProduced = recipe.producedItems && recipe.producedItems.length > 0;
+        if (!hasConsumed && !hasProduced) return '';
+
+        var cd = calcData[recipeIdx] || { prices: {}, open: false };
+        var html = '<div class="calc-section">';
+        html += '<button class="calc-toggle-btn" data-calc-idx="' + recipeIdx + '">';
+        html += (cd.open ? '&#9662;' : '&#9656;') + ' Profit Calculator</button>';
+
+        if (cd.open) {
+            html += '<div class="calc-panel">';
+
+            // Consumed items price inputs
+            var totalCost = 0;
+            if (hasConsumed) {
+                html += '<div class="calc-group-label">Buy Prices (consumed per unit)</div>';
+                html += '<div class="calc-item-rows">';
+                if (recipe.consumed) {
+                    for (var i = 0; i < recipe.consumed.length; i++) {
+                        var c = recipe.consumed[i];
+                        var key = 'buy_' + i;
+                        var price = cd.prices[key] || 0;
+                        var lineCost = c.quantity * price;
+                        totalCost += lineCost;
+                        html += '<div class="calc-item-row">';
+                        html += '<span class="calc-item-name">' + escapeHtml(prettifyName(c.item)) + ' <span class="calc-item-qty">x' + formatNumber(c.quantity) + '</span></span>';
+                        html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + key + '" value="' + (price || '') + '" min="0" step="any" placeholder="0">';
+                        html += '</div>';
+                    }
+                }
+                if (recipe.consumedAlt) {
+                    for (var j = 0; j < recipe.consumedAlt.length; j++) {
+                        var a = recipe.consumedAlt[j];
+                        var aKey = 'alt_' + j;
+                        var aPrice = cd.prices[aKey] || 0;
+                        var aLineCost = a.quantity * aPrice;
+                        totalCost += aLineCost;
+                        var altNames = a.alternatives.map(function(x) { return prettifyName(x); }).join(' / ');
+                        html += '<div class="calc-item-row">';
+                        html += '<span class="calc-item-name calc-item-alt">' + escapeHtml(altNames) + ' <span class="calc-item-qty">x' + formatNumber(a.quantity) + '</span></span>';
+                        html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + aKey + '" value="' + (aPrice || '') + '" min="0" step="any" placeholder="0">';
+                        html += '</div>';
+                    }
+                }
+                html += '</div>';
+            }
+
+            // Produced items price inputs
+            var totalRevenue = 0;
+            if (hasProduced) {
+                html += '<div class="calc-group-label">Sell Prices (produced per unit)</div>';
+                html += '<div class="calc-item-rows">';
+                for (var k = 0; k < recipe.producedItems.length; k++) {
+                    var p = recipe.producedItems[k];
+                    var pKey = 'sell_' + k;
+                    var pPrice = cd.prices[pKey] || 0;
+                    var lineRev = p.quantity * pPrice;
+                    totalRevenue += lineRev;
+                    html += '<div class="calc-item-row">';
+                    html += '<span class="calc-item-name calc-item-prod">' + escapeHtml(prettifyName(p.item)) + ' <span class="calc-item-qty">x' + formatNumber(p.quantity) + '</span></span>';
+                    html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + pKey + '" value="' + (pPrice || '') + '" min="0" step="any" placeholder="0">';
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+
+            // Results
+            var batchProfit = totalRevenue - totalCost;
+            var marginPct = totalCost > 0 ? ((batchProfit / totalCost) * 100) : 0;
+            var dCost = Math.round(totalCost * mult);
+            var dRevenue = Math.round(totalRevenue * mult);
+            var dProfit = Math.round(batchProfit * mult);
+            var profitCls = dProfit >= 0 ? 'calc-profit-pos' : 'calc-profit-neg';
+            var marginStr = totalCost > 0 ? marginPct.toFixed(1) + '%' : '&mdash;';
+
+            html += '<div class="calc-results" data-calc-results="' + recipeIdx + '">';
+            html += calcResultsHTML(dCost, dRevenue, dProfit, profitCls, marginStr);
+            html += '</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+        return html;
+    }
+
+    function calcResultsHTML(dCost, dRevenue, dProfit, profitCls, marginStr) {
+        return '<div class="calc-row"><span>Total Cost</span><span class="calc-val-cost">$' + formatNumber(dCost) + '</span></div>' +
+            '<div class="calc-row"><span>Total Revenue</span><span class="calc-val-rev">$' + formatNumber(dRevenue) + '</span></div>' +
+            '<div class="calc-row calc-row-margin"><span>Margin</span><span class="' + profitCls + '">$' + formatNumber(dProfit) + ' (' + marginStr + ')</span></div>';
+    }
+
+    // Update calc results in-place (no re-render, keeps input focus)
+    function updateCalcResults(idx) {
+        var recipe = filteredRecipes[idx];
+        if (!recipe) return;
+        var cd = calcData[idx] || { prices: {} };
+        var is24h = !!dailyModeCards[idx];
+        var factionFilter = document.getElementById('faction-filter').value;
+        var mult = 1;
+        if (is24h && recipe.cookingRate) {
+            var m24 = get24hMultiplier(recipe, factionFilter);
+            if (m24 !== null) mult = m24;
+        }
+        var totalCost = 0;
+        if (recipe.consumed) {
+            for (var i = 0; i < recipe.consumed.length; i++) {
+                totalCost += recipe.consumed[i].quantity * (cd.prices['buy_' + i] || 0);
+            }
+        }
+        if (recipe.consumedAlt) {
+            for (var j = 0; j < recipe.consumedAlt.length; j++) {
+                totalCost += recipe.consumedAlt[j].quantity * (cd.prices['alt_' + j] || 0);
+            }
+        }
+        var totalRevenue = 0;
+        if (recipe.producedItems) {
+            for (var k = 0; k < recipe.producedItems.length; k++) {
+                totalRevenue += recipe.producedItems[k].quantity * (cd.prices['sell_' + k] || 0);
+            }
+        }
+        var batchProfit = totalRevenue - totalCost;
+        var marginPct = totalCost > 0 ? ((batchProfit / totalCost) * 100) : 0;
+        var dCost = Math.round(totalCost * mult);
+        var dRevenue = Math.round(totalRevenue * mult);
+        var dProfit = Math.round(batchProfit * mult);
+        var profitCls = dProfit >= 0 ? 'calc-profit-pos' : 'calc-profit-neg';
+        var marginStr = totalCost > 0 ? marginPct.toFixed(1) + '%' : '&mdash;';
+        var el = document.querySelector('[data-calc-results="' + idx + '"]');
+        if (!el) return;
+        el.innerHTML = calcResultsHTML(dCost, dRevenue, dProfit, profitCls, marginStr);
+    }
+
     // Render a single recipe card
     function renderRecipeCard(recipe, selectedFaction, recipeIdx) {
         var category = getCategory(recipe);
@@ -326,6 +460,9 @@
         // Cooking time section
         var cookingSectionHTML = renderCookingSection(recipe, selectedFaction);
 
+        // Profit calculator section
+        var calcSectionHTML = renderCalcSection(recipe, recipeIdx, mult);
+
         return '<div class="recipe-card" data-idx="' + recipeIdx + '">' +
             '<div class="recipe-header">' +
                 '<span class="recipe-name">' + escapeHtml(recipe.infotext) + '</span>' +
@@ -337,7 +474,9 @@
             '</div>' +
             cookingSectionHTML +
             toggleHTML +
-            materialsHTML + altHTML + catalystHTML + producedHTML + affHTML +
+            materialsHTML + altHTML + catalystHTML +
+            calcSectionHTML +
+            producedHTML + affHTML +
         '</div>';
     }
 
@@ -464,6 +603,40 @@
                         tmp.innerHTML = renderRecipeCard(filteredRecipes[idx], factionFilter, idx);
                         cardEl.replaceWith(tmp.firstChild);
                     }
+                });
+
+                // Calculator toggle delegation
+                document.getElementById('recipe-list').addEventListener('click', function(e) {
+                    var calcBtn = e.target.closest('.calc-toggle-btn');
+                    if (!calcBtn) return;
+                    var idx = parseInt(calcBtn.getAttribute('data-calc-idx'), 10);
+                    if (!calcData[idx]) calcData[idx] = { prices: {}, open: false };
+                    calcData[idx].open = !calcData[idx].open;
+                    var factionFilter = document.getElementById('faction-filter').value;
+                    var cardEl = document.querySelector('.recipe-card[data-idx="' + idx + '"]');
+                    if (cardEl) {
+                        var tmp = document.createElement('div');
+                        tmp.innerHTML = renderRecipeCard(filteredRecipes[idx], factionFilter, idx);
+                        cardEl.replaceWith(tmp.firstChild);
+                        if (calcData[idx].open) {
+                            var newCard = document.querySelector('.recipe-card[data-idx="' + idx + '"]');
+                            var fi = newCard && newCard.querySelector('.calc-input');
+                            if (fi) fi.focus();
+                        }
+                    }
+                });
+
+                // Calculator per-item price input real-time update
+                document.getElementById('recipe-list').addEventListener('input', function(e) {
+                    var inp = e.target.closest('.calc-input');
+                    if (!inp) return;
+                    var idxAttr = inp.getAttribute('data-calc-price');
+                    if (idxAttr === null) return;
+                    var idx = parseInt(idxAttr, 10);
+                    var key = inp.getAttribute('data-calc-key');
+                    if (!calcData[idx]) calcData[idx] = { prices: {}, open: true };
+                    calcData[idx].prices[key] = parseFloat(inp.value) || 0;
+                    updateCalcResults(idx);
                 });
             })
             .catch(function(err) {

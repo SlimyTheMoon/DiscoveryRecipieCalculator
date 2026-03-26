@@ -429,6 +429,136 @@ select:focus, input:focus {
     margin-bottom: 0.5rem;
 }
 
+/* Profit Calculator */
+.calc-section {
+    margin-top: 0.75rem;
+}
+
+.calc-toggle-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--accent);
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+.calc-toggle-btn:hover {
+    border-color: var(--accent);
+}
+
+.calc-panel {
+    margin-top: 0.5rem;
+    background: rgba(13,17,23,0.5);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.calc-group-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.3rem;
+    margin-top: 0.5rem;
+}
+
+.calc-group-label:first-child {
+    margin-top: 0;
+}
+
+.calc-item-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+}
+
+.calc-item-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.calc-item-name {
+    flex: 1;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calc-item-name.calc-item-alt {
+    color: var(--purple);
+    font-style: italic;
+}
+
+.calc-item-name.calc-item-prod {
+    color: var(--green);
+}
+
+.calc-item-qty {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+.calc-input {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-family: inherit;
+    width: 90px;
+    text-align: right;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.calc-input::-webkit-outer-spin-button,
+.calc-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.calc-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.calc-results {
+    border-top: 1px solid var(--border);
+    padding-top: 0.5rem;
+}
+
+.calc-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.calc-row-margin {
+    border-top: 1px solid var(--border);
+    margin-top: 0.25rem;
+    padding-top: 0.35rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.calc-val-cost { color: var(--red); }
+.calc-val-rev { color: var(--green); }
+.calc-profit-pos { color: var(--green); font-weight: 600; }
+.calc-profit-neg { color: var(--red); font-weight: 600; }
+
 /* Footer */
 footer {
     text-align: center;
