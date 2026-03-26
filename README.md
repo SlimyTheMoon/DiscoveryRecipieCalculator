@@ -2,15 +2,20 @@
 
 A static site generator and crafting calculator for [Discovery Freelancer](https://discoverygc.com/). Parses game recipe configuration files and produces a filterable, searchable web interface for all crafting recipes.
 
+**[Live Version](https://slimythemoon.github.io/DiscoveryRecipieCalculator/)**
+
 ## Features
 
 - Parses `base_recipe_items.cfg` and `base_recipe_modules.cfg` from the `sources/` directory
 - Generates a static site with all recipes as interactive, filterable cards
-- Filter by **source** (Items / Modules), **category** (JumpDrive, Cloak, Factory, Refinery, etc.), and **free-text search**
-- **Faction affiliation filter** — select a faction to highlight bonus recipes and see adjusted cooking times
-- **Cooking time calculation** — `total consumed units ÷ cooking rate (units/min)` with formula breakdown
-- Material proportion bar showing each ingredient's share of processing time
+- Filter by **source** (Items / Modules), **category**, and **free-text search**
+- **Faction affiliation bonus** — searchable autocomplete to select a faction, see adjusted material quantities and cooking times
+- **"Only with bonus" filter** — when a faction is selected, toggle to show only recipes that faction has a bonus on
+- **Per Batch / 24 Hours toggle** — switch between per-batch and 24-hour production views (items only, not modules)
+- **Profit calculator** — per-item buy/sell price inputs with real-time cost, revenue, and margin calculation; updates with batch/24h mode and affiliation bonuses
+- **Cooking time calculation** — `total consumed units ÷ cooking rate (units/min)` with formula breakdown and material proportion bar
 - Supports consumed items, dynamic alternatives (OR choices), and catalysts
+- Module recipes show produced items resolved from craft lists
 - Dark themed, responsive UI
 
 ## Project Structure
@@ -79,7 +84,11 @@ The calculator will be available at **http://localhost:8080**.
 
 ## GitHub Pages
 
-The `docs/` folder contains the generated static site. To publish with GitHub Pages:
+The `docs/` folder contains the generated static site and is published at:
+
+**https://slimythemoon.github.io/DiscoveryRecipieCalculator/**
+
+To set up GitHub Pages on your own fork:
 
 1. Push the repository to GitHub
 2. Go to **Settings → Pages**
