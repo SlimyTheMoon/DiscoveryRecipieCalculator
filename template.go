@@ -12,6 +12,7 @@ const indexHTML = `<!DOCTYPE html>
     <header>
         <h1>Discovery Recipe Calculator</h1>
         <p class="subtitle">Crafting reference for Discovery Freelancer</p>
+        <p class="subtitle"><a href="https://github.com/SlimyTheMoon/DiscoveryRecipieCalculator" target="_blank" rel="noopener">GitHub</a></p>
     </header>
 
     <main>
