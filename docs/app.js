@@ -197,7 +197,8 @@
     }
 
     // Render profit calculator section
-    function renderCalcSection(recipe, recipeIdx, mult) {
+    function renderCalcSection(recipe, recipeIdx, mult, bonus) {
+        var bFactor = bonus || 1;
         var hasConsumed = (recipe.consumed && recipe.consumed.length > 0) || (recipe.consumedAlt && recipe.consumedAlt.length > 0);
         var hasProduced = recipe.producedItems && recipe.producedItems.length > 0;
         if (!hasConsumed && !hasProduced) return '';
@@ -220,10 +221,11 @@
                         var c = recipe.consumed[i];
                         var key = 'buy_' + i;
                         var price = cd.prices[key] || 0;
-                        var lineCost = c.quantity * price;
+                        var adjQty = Math.round(c.quantity * bFactor);
+                        var lineCost = adjQty * price;
                         totalCost += lineCost;
                         html += '<div class="calc-item-row">';
-                        html += '<span class="calc-item-name">' + escapeHtml(prettifyName(c.item)) + ' <span class="calc-item-qty">x' + formatNumber(c.quantity) + '</span></span>';
+                        html += '<span class="calc-item-name">' + escapeHtml(prettifyName(c.item)) + ' <span class="calc-item-qty">x' + formatNumber(adjQty) + (bFactor < 1 ? ' <span class="calc-bonus-tag">(-' + Math.round((1-bFactor)*100) + '%)</span>' : '') + '</span></span>';
                         html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + key + '" value="' + (price || '') + '" min="0" step="any" placeholder="0">';
                         html += '</div>';
                     }
@@ -233,11 +235,12 @@
                         var a = recipe.consumedAlt[j];
                         var aKey = 'alt_' + j;
                         var aPrice = cd.prices[aKey] || 0;
-                        var aLineCost = a.quantity * aPrice;
+                        var adjAltQty = Math.round(a.quantity * bFactor);
+                        var aLineCost = adjAltQty * aPrice;
                         totalCost += aLineCost;
                         var altNames = a.alternatives.map(function(x) { return prettifyName(x); }).join(' / ');
                         html += '<div class="calc-item-row">';
-                        html += '<span class="calc-item-name calc-item-alt">' + escapeHtml(altNames) + ' <span class="calc-item-qty">x' + formatNumber(a.quantity) + '</span></span>';
+                        html += '<span class="calc-item-name calc-item-alt">' + escapeHtml(altNames) + ' <span class="calc-item-qty">x' + formatNumber(adjAltQty) + (bFactor < 1 ? ' <span class="calc-bonus-tag">(-' + Math.round((1-bFactor)*100) + '%)</span>' : '') + '</span></span>';
                         html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + aKey + '" value="' + (aPrice || '') + '" min="0" step="any" placeholder="0">';
                         html += '</div>';
                     }
@@ -300,15 +303,24 @@
             var m24 = get24hMultiplier(recipe, factionFilter);
             if (m24 !== null) mult = m24;
         }
+        var bonus = 1;
+        if (factionFilter && factionFilter !== 'none' && recipe.affiliations) {
+            for (var af = 0; af < recipe.affiliations.length; af++) {
+                if (recipe.affiliations[af].faction === factionFilter) {
+                    bonus = recipe.affiliations[af].bonus;
+                    break;
+                }
+            }
+        }
         var totalCost = 0;
         if (recipe.consumed) {
             for (var i = 0; i < recipe.consumed.length; i++) {
-                totalCost += recipe.consumed[i].quantity * (cd.prices['buy_' + i] || 0);
+                totalCost += Math.round(recipe.consumed[i].quantity * bonus) * (cd.prices['buy_' + i] || 0);
             }
         }
         if (recipe.consumedAlt) {
             for (var j = 0; j < recipe.consumedAlt.length; j++) {
-                totalCost += recipe.consumedAlt[j].quantity * (cd.prices['alt_' + j] || 0);
+                totalCost += Math.round(recipe.consumedAlt[j].quantity * bonus) * (cd.prices['alt_' + j] || 0);
             }
         }
         var totalRevenue = 0;
@@ -361,13 +373,25 @@
             }
         }
 
+        // Compute affiliation bonus for materials & calculator
+        var affiliationBonus = 1;
+        if (selectedFaction && selectedFaction !== 'none' && recipe.affiliations) {
+            for (var ab = 0; ab < recipe.affiliations.length; ab++) {
+                if (recipe.affiliations[ab].faction === selectedFaction) {
+                    affiliationBonus = recipe.affiliations[ab].bonus;
+                    break;
+                }
+            }
+        }
+
         var materialsHTML = '';
         if (recipe.consumed && recipe.consumed.length > 0) {
             materialsHTML += '<table class="materials-table"><thead><tr><th>Material</th><th style="text-align:right">Quantity</th></tr></thead><tbody>';
             for (var i = 0; i < recipe.consumed.length; i++) {
                 var c = recipe.consumed[i];
+                var adjQty = Math.floor(c.quantity * affiliationBonus * mult);
                 materialsHTML += '<tr><td class="item-name">' + escapeHtml(prettifyName(c.item)) + '</td>' +
-                    '<td class="item-qty">' + formatNumber(Math.floor(c.quantity * mult)) + '</td></tr>';
+                    '<td class="item-qty">' + formatNumber(adjQty) + '</td></tr>';
             }
             materialsHTML += '</tbody></table>';
         }
@@ -379,8 +403,9 @@
             for (var j = 0; j < recipe.consumedAlt.length; j++) {
                 var a = recipe.consumedAlt[j];
                 var names = a.alternatives.map(function(x) { return prettifyName(x); }).join(' OR ');
+                var adjAltQty = Math.floor(a.quantity * affiliationBonus * mult);
                 altHTML += '<tr><td class="item-alt">' + escapeHtml(names) + '</td>' +
-                    '<td class="item-qty">' + formatNumber(Math.floor(a.quantity * mult)) + '</td></tr>';
+                    '<td class="item-qty">' + formatNumber(adjAltQty) + '</td></tr>';
             }
             altHTML += '</tbody></table>';
         }
@@ -461,7 +486,7 @@
         var cookingSectionHTML = renderCookingSection(recipe, selectedFaction);
 
         // Profit calculator section
-        var calcSectionHTML = renderCalcSection(recipe, recipeIdx, mult);
+        var calcSectionHTML = renderCalcSection(recipe, recipeIdx, mult, affiliationBonus);
 
         return '<div class="recipe-card" data-idx="' + recipeIdx + '">' +
             '<div class="recipe-header">' +

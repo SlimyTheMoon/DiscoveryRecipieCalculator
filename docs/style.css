@@ -506,6 +506,11 @@ select:focus, input:focus {
     font-size: 0.75rem;
 }
 
+.calc-bonus-tag {
+    color: var(--green);
+    font-weight: 600;
+}
+
 .calc-input {
     background: var(--bg-primary);
     border: 1px solid var(--border);
