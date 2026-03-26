@@ -1,0 +1,374 @@
+package main
+
+const styleCSS = `/* Discovery Recipe Calculator */
+:root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    text-align: center;
+}
+
+header h1 {
+    font-size: 1.8rem;
+    color: var(--accent);
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem;
+}
+
+/* Controls */
+.controls {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.filter-group label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+select, input[type="text"] {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    min-width: 180px;
+}
+
+select:focus, input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.stats {
+    margin-left: auto;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    align-self: center;
+}
+
+/* Recipe List */
+.recipe-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 1rem;
+}
+
+.recipe-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    transition: border-color 0.2s;
+}
+
+.recipe-card:hover {
+    border-color: var(--accent);
+}
+
+.recipe-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.recipe-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.recipe-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.recipe-badge.craft { border-color: var(--green); color: var(--green); }
+.recipe-badge.build { border-color: var(--purple); color: var(--purple); }
+
+.recipe-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.recipe-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.meta-label { font-weight: 600; }
+
+.cooking-time {
+    color: var(--orange);
+    font-weight: 600;
+}
+
+/* Cooking Time Section */
+.cooking-section {
+    background: rgba(13,17,23,0.5);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.cooking-header {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.cooking-time-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+
+.cooking-time-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--orange);
+    font-variant-numeric: tabular-nums;
+}
+
+.cooking-arrow {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.cooking-time-adjusted {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--green);
+    font-variant-numeric: tabular-nums;
+}
+
+.cooking-formula {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.cooking-op {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.cooking-bonus {
+    font-size: 0.8rem;
+    color: var(--green);
+    margin-top: 0.3rem;
+}
+
+.cooking-breakdown {
+    margin-top: 0.5rem;
+}
+
+.cooking-bar {
+    display: flex;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.cooking-bar-seg {
+    height: 100%;
+    transition: opacity 0.2s;
+    opacity: 0.8;
+}
+
+.cooking-bar-seg:hover {
+    opacity: 1;
+}
+
+/* Materials Table */
+.materials-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+.materials-table th {
+    text-align: left;
+    color: var(--text-secondary);
+    font-weight: 500;
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.materials-table td {
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid rgba(48,54,61,0.5);
+}
+
+.materials-table tr:last-child td {
+    border-bottom: none;
+}
+
+.item-name {
+    color: var(--text-primary);
+}
+
+.item-qty {
+    color: var(--orange);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.item-alt {
+    color: var(--purple);
+    font-style: italic;
+}
+
+.item-catalyst {
+    color: var(--green);
+}
+
+/* Affiliations */
+.affiliations {
+    margin-top: 0.75rem;
+}
+
+.affiliations summary {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.affiliation-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.affiliation-tag {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(88,166,255,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(88,166,255,0.2);
+}
+
+.affiliation-tag.active {
+    background: rgba(63,185,80,0.15);
+    color: var(--green);
+    border-color: rgba(63,185,80,0.3);
+}
+
+/* Craft Lists */
+.craft-lists {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.craft-lists strong {
+    color: var(--text-primary);
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .stats {
+        margin-left: 0;
+    }
+    .recipe-list {
+        grid-template-columns: 1fr;
+    }
+    select, input[type="text"] {
+        min-width: unset;
+        width: 100%;
+    }
+}
+`
