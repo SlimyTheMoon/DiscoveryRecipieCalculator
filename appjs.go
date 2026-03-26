@@ -7,6 +7,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
     let siteData = null;
     let filteredRecipes = [];
     let craftTypeIndex = {}; // craftType -> [recipe, ...]
+    let dailyModeCards = {}; // recipeIndex -> true if 24h mode
 
     // Prettify commodity names: "commodity_basic_alloys" -> "Basic Alloys"
     function prettifyName(raw) {
@@ -152,22 +153,42 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
     }
 
     // Render produced items list
-    function renderProducedItems(recipe) {
+    function renderProducedItems(recipe, mult) {
         if (!recipe.producedItems || recipe.producedItems.length === 0) return '';
+        var m = mult || 1;
         if (recipe.producedItems.length === 1) {
             var p = recipe.producedItems[0];
+            var qty = Math.floor(p.quantity * m);
             return '<span><span class="meta-label">Produces:</span> ' +
                 escapeHtml(prettifyName(p.item)) +
-                (p.quantity > 1 ? ' x' + formatNumber(p.quantity) : '') + '</span>';
+                (qty > 1 ? ' x' + formatNumber(qty) : '') + '</span>';
         }
         var html = '<div class="produced-list"><span class="meta-label">Produces:</span><ul class="produced-items-list">';
         for (var i = 0; i < recipe.producedItems.length; i++) {
             var pi = recipe.producedItems[i];
+            var piQty = Math.floor(pi.quantity * m);
             html += '<li>' + escapeHtml(prettifyName(pi.item)) +
-                ' <span class="item-qty">x' + formatNumber(pi.quantity) + '</span></li>';
+                ' <span class="item-qty">x' + formatNumber(piQty) + '</span></li>';
         }
         html += '</ul></div>';
         return html;
+    }
+
+    // Compute 24h multiplier for a recipe
+    function get24hMultiplier(recipe, selectedFaction) {
+        var bonus = 1;
+        if (selectedFaction && selectedFaction !== 'none' && recipe.affiliations) {
+            for (var n = 0; n < recipe.affiliations.length; n++) {
+                if (recipe.affiliations[n].faction === selectedFaction) {
+                    bonus = recipe.affiliations[n].bonus;
+                    break;
+                }
+            }
+        }
+        var details = calcCookingDetails(recipe, bonus);
+        if (details.baseTime === null || details.baseTime === 0) return null;
+        var cookTime = details.adjustedTime !== null ? details.adjustedTime : details.baseTime;
+        return (24 * 60 * 60) / cookTime;
     }
 
     function escapeHtml(text) {
@@ -177,9 +198,36 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
     }
 
     // Render a single recipe card
-    function renderRecipeCard(recipe, selectedFaction) {
+    function renderRecipeCard(recipe, selectedFaction, recipeIdx) {
         var category = getCategory(recipe);
         var badgeClass = recipe.craftType ? 'craft' : (recipe.buildType ? 'build' : '');
+        var is24h = !!dailyModeCards[recipeIdx];
+        var mult = 1;
+        var batchesIn24h = null;
+        var has24hToggle = false;
+
+        if (recipe.cookingRate && recipe.cookingRate > 0) {
+            var m24 = get24hMultiplier(recipe, selectedFaction);
+            if (m24 !== null) {
+                has24hToggle = true;
+                batchesIn24h = m24;
+                if (is24h) mult = m24;
+            }
+        }
+
+        // Toggle button
+        var toggleHTML = '';
+        if (has24hToggle) {
+            toggleHTML = '<div class="qty-toggle">';
+            toggleHTML += '<button class="toggle-btn' + (!is24h ? ' active' : '') + '" data-idx="' + recipeIdx + '" data-mode="batch">Per Batch</button>';
+            toggleHTML += '<button class="toggle-btn' + (is24h ? ' active' : '') + '" data-idx="' + recipeIdx + '" data-mode="daily">24 Hours</button>';
+            toggleHTML += '</div>';
+            if (is24h) {
+                var details = calcCookingDetails(recipe, 1);
+                var cookTime = details.adjustedTime !== null ? details.adjustedTime : details.baseTime;
+                toggleHTML += '<div class="daily-info">' + formatNumber(Math.floor(batchesIn24h)) + ' batches &mdash; one every ' + formatTime(cookTime) + '</div>';
+            }
+        }
 
         var materialsHTML = '';
         if (recipe.consumed && recipe.consumed.length > 0) {
@@ -187,7 +235,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
             for (var i = 0; i < recipe.consumed.length; i++) {
                 var c = recipe.consumed[i];
                 materialsHTML += '<tr><td class="item-name">' + escapeHtml(prettifyName(c.item)) + '</td>' +
-                    '<td class="item-qty">' + formatNumber(c.quantity) + '</td></tr>';
+                    '<td class="item-qty">' + formatNumber(Math.floor(c.quantity * mult)) + '</td></tr>';
             }
             materialsHTML += '</tbody></table>';
         }
@@ -200,12 +248,12 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
                 var a = recipe.consumedAlt[j];
                 var names = a.alternatives.map(function(x) { return prettifyName(x); }).join(' OR ');
                 altHTML += '<tr><td class="item-alt">' + escapeHtml(names) + '</td>' +
-                    '<td class="item-qty">' + formatNumber(a.quantity) + '</td></tr>';
+                    '<td class="item-qty">' + formatNumber(Math.floor(a.quantity * mult)) + '</td></tr>';
             }
             altHTML += '</tbody></table>';
         }
 
-        // Catalysts
+        // Catalysts (not consumed, show per batch always)
         var catalystHTML = '';
         if (recipe.catalysts && recipe.catalysts.length > 0) {
             catalystHTML = '<table class="materials-table"><thead><tr><th>Catalyst (not consumed)</th><th style="text-align:right">Qty</th></tr></thead><tbody>';
@@ -280,16 +328,17 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         // Cooking time section
         var cookingSectionHTML = renderCookingSection(recipe, selectedFaction);
 
-        return '<div class="recipe-card">' +
+        return '<div class="recipe-card" data-idx="' + recipeIdx + '">' +
             '<div class="recipe-header">' +
                 '<span class="recipe-name">' + escapeHtml(recipe.infotext) + '</span>' +
                 '<span class="recipe-badge ' + badgeClass + '">' + escapeHtml(category) + '</span>' +
             '</div>' +
             '<div class="recipe-meta">' +
-                renderProducedItems(recipe) +
+                renderProducedItems(recipe, mult) +
                 extraMeta +
             '</div>' +
             cookingSectionHTML +
+            toggleHTML +
             materialsHTML + altHTML + catalystHTML + producedHTML + affHTML +
         '</div>';
     }
@@ -326,7 +375,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         } else {
             var html = [];
             for (var i = 0; i < filteredRecipes.length; i++) {
-                html.push(renderRecipeCard(filteredRecipes[i], factionFilter));
+                html.push(renderRecipeCard(filteredRecipes[i], factionFilter, i));
             }
             container.innerHTML = html.join('');
         }
@@ -401,6 +450,23 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
                 document.getElementById('category-filter').addEventListener('change', applyFilters);
                 document.getElementById('search-input').addEventListener('input', applyFilters);
                 document.getElementById('faction-filter').addEventListener('change', applyFilters);
+
+                // Toggle button delegation
+                document.getElementById('recipe-list').addEventListener('click', function(e) {
+                    var btn = e.target.closest('.toggle-btn');
+                    if (!btn) return;
+                    var idx = parseInt(btn.getAttribute('data-idx'), 10);
+                    var mode = btn.getAttribute('data-mode');
+                    dailyModeCards[idx] = (mode === 'daily');
+                    // Re-render just that card
+                    var factionFilter = document.getElementById('faction-filter').value;
+                    var cardEl = document.querySelector('.recipe-card[data-idx="' + idx + '"]');
+                    if (cardEl) {
+                        var tmp = document.createElement('div');
+                        tmp.innerHTML = renderRecipeCard(filteredRecipes[idx], factionFilter, idx);
+                        cardEl.replaceWith(tmp.firstChild);
+                    }
+                });
             })
             .catch(function(err) {
                 console.error('Failed to load recipe data:', err);

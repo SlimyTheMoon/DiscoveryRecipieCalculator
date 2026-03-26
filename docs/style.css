@@ -391,6 +391,42 @@ select:focus, input:focus {
     font-size: 0.75rem;
 }
 
+/* Toggle Button */
+.qty-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.toggle-btn {
+    background: var(--bg-primary);
+    border: none;
+    color: var(--text-secondary);
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    font-family: inherit;
+}
+
+.toggle-btn:hover {
+    color: var(--text-primary);
+}
+
+.toggle-btn.active {
+    background: var(--accent);
+    color: #0d1117;
+    font-weight: 600;
+}
+
+.daily-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
 /* Footer */
 footer {
     text-align: center;
