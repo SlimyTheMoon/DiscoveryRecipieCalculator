@@ -350,7 +350,7 @@
         var batchesIn24h = null;
         var has24hToggle = false;
 
-        if (recipe.cookingRate && recipe.cookingRate > 0) {
+        if (recipe.source !== 'modules' && recipe.cookingRate && recipe.cookingRate > 0) {
             var m24 = get24hMultiplier(recipe, selectedFaction);
             if (m24 !== null) {
                 has24hToggle = true;
