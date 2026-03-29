@@ -18,20 +18,25 @@
     }
 
     // Get effective alt quantity: if hFuelHalf is on, and the group is a fuel alt group,
-    // the H-fuel quantity is halved; Mox/Promethene keep the listed quantity.
-    // For display in the materials table we show each fuel with its effective qty.
+    // show only H-Fuel at half quantity. When off, show only Mox/Promethene (exclude H-Fuel).
     function getFuelAltDisplay(altEntry, bonusFactor, mult) {
         var bf = bonusFactor || 1;
         var m = mult || 1;
-        if (!hFuelHalf || !isFuelAltGroup(altEntry.alternatives)) {
-            return null; // use default display
+        if (!isFuelAltGroup(altEntry.alternatives)) {
+            return null; // not a fuel group, use default display
         }
         var rows = [];
-        for (var i = 0; i < altEntry.alternatives.length; i++) {
-            var name = altEntry.alternatives[i];
-            var qty = altEntry.quantity;
-            if (name === HFUEL_ITEM) qty = Math.ceil(qty / 2);
-            rows.push({ name: name, quantity: Math.floor(qty * bf * m) });
+        if (hFuelHalf) {
+            // H-Fuel mode: show only H-Fuel at half quantity
+            var qty = Math.ceil(altEntry.quantity / 2);
+            rows.push({ name: HFUEL_ITEM, quantity: Math.floor(qty * bf * m), isHfuel: true });
+        } else {
+            // Normal mode: show only Mox/Promethene (exclude H-Fuel)
+            for (var i = 0; i < altEntry.alternatives.length; i++) {
+                var name = altEntry.alternatives[i];
+                if (name === HFUEL_ITEM) continue;
+                rows.push({ name: name, quantity: Math.floor(altEntry.quantity * bf * m), isHfuel: false });
+            }
         }
         return rows;
     }
@@ -278,10 +283,9 @@
                                 var fcPrice = cd.prices[fcKey] || 0;
                                 var fcCost = fuelCalcRows[fc].quantity * fcPrice;
                                 totalCost += fcCost;
-                                var fcIsHfuel = fuelCalcRows[fc].name === HFUEL_ITEM;
                                 html += '<div class="calc-item-row">';
                                 html += '<span class="calc-item-name calc-item-alt">' + escapeHtml(prettifyName(fuelCalcRows[fc].name));
-                                if (fcIsHfuel) html += ' <span class="hfuel-half-tag">(\u00BD)</span>';
+                                if (fuelCalcRows[fc].isHfuel) html += ' <span class="hfuel-half-tag">(\u00BD)</span>';
                                 html += ' <span class="calc-item-qty">x' + formatNumber(fuelCalcRows[fc].quantity) + (bFactor < 1 ? ' <span class="calc-bonus-tag">(-' + Math.round((1-bFactor)*100) + '%)</span>' : '') + '</span></span>';
                                 html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + fcKey + '" value="' + (fcPrice || '') + '" min="0" step="any" placeholder="0">';
                                 html += '</div>';
@@ -470,9 +474,8 @@
                 var fuelRows = getFuelAltDisplay(a, affiliationBonus, mult);
                 if (fuelRows) {
                     for (var fr = 0; fr < fuelRows.length; fr++) {
-                        var isHfuel = fuelRows[fr].name === HFUEL_ITEM;
                         altHTML += '<tr><td class="item-alt">' + escapeHtml(prettifyName(fuelRows[fr].name));
-                        if (isHfuel) altHTML += ' <span class="hfuel-half-tag">(\u00BD)</span>';
+                        if (fuelRows[fr].isHfuel) altHTML += ' <span class="hfuel-half-tag">(\u00BD)</span>';
                         altHTML += '</td><td class="item-qty">' + formatNumber(fuelRows[fr].quantity) + '</td></tr>';
                     }
                 } else {
@@ -735,39 +738,82 @@
         function xmlEsc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
         function textCell(v) { return '<table:table-cell office:value-type="string"><text:p>' + xmlEsc(v) + '</text:p></table:table-cell>'; }
         function numCell(v) { return '<table:table-cell office:value-type="float" office:value="' + v + '"><text:p>' + v + '</text:p></table:table-cell>'; }
+        function formulaCell(formula, display) { return '<table:table-cell table:formula="of:=' + xmlEsc(formula) + '" office:value-type="float"><text:p>' + xmlEsc(String(display)) + '</text:p></table:table-cell>'; }
+        function pctFormulaCell(formula, display) { return '<table:table-cell table:formula="of:=' + xmlEsc(formula) + '" office:value-type="percentage"><text:p>' + xmlEsc(String(display)) + '</text:p></table:table-cell>'; }
         function emptyCell() { return '<table:table-cell/>'; }
 
+        // Row tracking (1-indexed spreadsheet rows)
+        var rowNum = 0;
         var rows = [];
-        // Title
+
+        // Row 1: Title
+        rowNum++;
         rows.push('<table:table-row>' + textCell(recipe.infotext + (is24h ? ' (24h)' : ' (per batch)')) + emptyCell() + emptyCell() + emptyCell() + '</table:table-row>');
+        // Row 2: empty
+        rowNum++;
         rows.push('<table:table-row>' + emptyCell() + emptyCell() + emptyCell() + emptyCell() + '</table:table-row>');
 
-        // Consumed header
+        // Row 3: Consumed header
+        rowNum++;
         rows.push('<table:table-row>' + textCell('Consumed Materials') + textCell('Quantity') + textCell('Price Each') + textCell('Line Total') + '</table:table-row>');
+
+        // Consumed data rows with formula D=B*C
+        var consumedFirstRow = rowNum + 1;
         for (var ci = 0; ci < consumedRows.length; ci++) {
-            rows.push('<table:table-row>' + textCell(consumedRows[ci][0]) + numCell(consumedRows[ci][1]) + numCell(consumedRows[ci][2]) + numCell(consumedRows[ci][3]) + '</table:table-row>');
+            rowNum++;
+            var cFormula = '[.B' + rowNum + ']*[.C' + rowNum + ']';
+            rows.push('<table:table-row>' + textCell(consumedRows[ci][0]) + numCell(consumedRows[ci][1]) + numCell(consumedRows[ci][2]) + formulaCell(cFormula, consumedRows[ci][3]) + '</table:table-row>');
         }
+        var consumedLastRow = rowNum;
+
+        // Empty separator
+        rowNum++;
         rows.push('<table:table-row>' + emptyCell() + emptyCell() + emptyCell() + emptyCell() + '</table:table-row>');
 
         // Produced header
+        rowNum++;
         rows.push('<table:table-row>' + textCell('Produced Items') + textCell('Quantity') + textCell('Price Each') + textCell('Line Total') + '</table:table-row>');
+
+        // Produced data rows with formula D=B*C
+        var producedFirstRow = rowNum + 1;
         for (var pi = 0; pi < producedRows.length; pi++) {
-            rows.push('<table:table-row>' + textCell(producedRows[pi][0]) + numCell(producedRows[pi][1]) + numCell(producedRows[pi][2]) + numCell(producedRows[pi][3]) + '</table:table-row>');
+            rowNum++;
+            var pFormula = '[.B' + rowNum + ']*[.C' + rowNum + ']';
+            rows.push('<table:table-row>' + textCell(producedRows[pi][0]) + numCell(producedRows[pi][1]) + numCell(producedRows[pi][2]) + formulaCell(pFormula, producedRows[pi][3]) + '</table:table-row>');
         }
+        var producedLastRow = rowNum;
+
+        // Empty separator
+        rowNum++;
         rows.push('<table:table-row>' + emptyCell() + emptyCell() + emptyCell() + emptyCell() + '</table:table-row>');
 
-        // Summary
-        rows.push('<table:table-row>' + textCell('Total Cost') + emptyCell() + emptyCell() + numCell(Math.round(totalCost)) + '</table:table-row>');
-        rows.push('<table:table-row>' + textCell('Total Revenue') + emptyCell() + emptyCell() + numCell(Math.round(totalRevenue)) + '</table:table-row>');
-        rows.push('<table:table-row>' + textCell('Profit') + emptyCell() + emptyCell() + numCell(Math.round(profit)) + '</table:table-row>');
-        if (totalCost > 0) {
-            rows.push('<table:table-row>' + textCell('Margin') + emptyCell() + emptyCell() + textCell(((profit / totalCost) * 100).toFixed(1) + '%') + '</table:table-row>');
-        }
+        // Summary with formulas
+        var costFormula = consumedRows.length > 0 ? 'SUM([.D' + consumedFirstRow + ':.D' + consumedLastRow + '])' : '0';
+        var revFormula = producedRows.length > 0 ? 'SUM([.D' + producedFirstRow + ':.D' + producedLastRow + '])' : '0';
+
+        rowNum++;
+        var costRow = rowNum;
+        rows.push('<table:table-row>' + textCell('Total Cost') + emptyCell() + emptyCell() + formulaCell(costFormula, Math.round(totalCost)) + '</table:table-row>');
+
+        rowNum++;
+        var revRow = rowNum;
+        rows.push('<table:table-row>' + textCell('Total Revenue') + emptyCell() + emptyCell() + formulaCell(revFormula, Math.round(totalRevenue)) + '</table:table-row>');
+
+        rowNum++;
+        var profitRow = rowNum;
+        var profitFormula = '[.D' + revRow + ']-[.D' + costRow + ']';
+        rows.push('<table:table-row>' + textCell('Profit') + emptyCell() + emptyCell() + formulaCell(profitFormula, Math.round(profit)) + '</table:table-row>');
+
+        rowNum++;
+        var marginFormula = 'IF([.D' + costRow + ']<>0;[.D' + profitRow + ']/[.D' + costRow + '];0)';
+        var marginDisplay = totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) + '%' : '0%';
+        rows.push('<table:table-row>' + textCell('Margin') + emptyCell() + emptyCell() + pctFormulaCell(marginFormula, marginDisplay) + '</table:table-row>');
 
         var contentXml = '<?xml version="1.0" encoding="UTF-8"?>' +
             '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" ' +
             'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" ' +
             'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" ' +
+            'xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2" ' +
             'office:version="1.2">' +
             '<office:body><office:spreadsheet>' +
             '<table:table table:name="Calculation">' +
