@@ -7,6 +7,34 @@
     let craftTypeIndex = {}; // craftType -> [recipe, ...]
     let dailyModeCards = {}; // recipeIndex -> true if 24h mode
     let calcData = {}; // recipeIndex -> { prices: { itemKey: price }, open: bool }
+    var hFuelHalf = false; // global toggle: H-fuel uses half units
+
+    // Fuel items that participate in the half-H-fuel mechanic
+    var HFUEL_ITEM = 'commodity_h_fuel';
+
+    // Check if a consumedAlt group contains fuel alternatives (Mox/Promethene/H-fuel)
+    function isFuelAltGroup(alternatives) {
+        return alternatives && alternatives.indexOf(HFUEL_ITEM) !== -1;
+    }
+
+    // Get effective alt quantity: if hFuelHalf is on, and the group is a fuel alt group,
+    // the H-fuel quantity is halved; Mox/Promethene keep the listed quantity.
+    // For display in the materials table we show each fuel with its effective qty.
+    function getFuelAltDisplay(altEntry, bonusFactor, mult) {
+        var bf = bonusFactor || 1;
+        var m = mult || 1;
+        if (!hFuelHalf || !isFuelAltGroup(altEntry.alternatives)) {
+            return null; // use default display
+        }
+        var rows = [];
+        for (var i = 0; i < altEntry.alternatives.length; i++) {
+            var name = altEntry.alternatives[i];
+            var qty = altEntry.quantity;
+            if (name === HFUEL_ITEM) qty = Math.ceil(qty / 2);
+            rows.push({ name: name, quantity: Math.floor(qty * bf * m) });
+        }
+        return rows;
+    }
 
     // Prettify commodity names: use real name from commodityNames, fallback to auto-prettify
     function prettifyName(raw) {
@@ -243,16 +271,33 @@
                 if (recipe.consumedAlt) {
                     for (var j = 0; j < recipe.consumedAlt.length; j++) {
                         var a = recipe.consumedAlt[j];
-                        var aKey = 'alt_' + j;
-                        var aPrice = cd.prices[aKey] || 0;
-                        var adjAltQty = Math.round(a.quantity * bFactor * mult);
-                        var aLineCost = adjAltQty * aPrice;
-                        totalCost += aLineCost;
-                        var altNames = a.alternatives.map(function(x) { return prettifyName(x); }).join(' / ');
-                        html += '<div class="calc-item-row">';
-                        html += '<span class="calc-item-name calc-item-alt">' + escapeHtml(altNames) + ' <span class="calc-item-qty">x' + formatNumber(adjAltQty) + (bFactor < 1 ? ' <span class="calc-bonus-tag">(-' + Math.round((1-bFactor)*100) + '%)</span>' : '') + '</span></span>';
-                        html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + aKey + '" value="' + (aPrice || '') + '" min="0" step="any" placeholder="0">';
-                        html += '</div>';
+                        var fuelCalcRows = getFuelAltDisplay(a, bFactor, mult);
+                        if (fuelCalcRows) {
+                            for (var fc = 0; fc < fuelCalcRows.length; fc++) {
+                                var fcKey = 'alt_' + j + '_' + fc;
+                                var fcPrice = cd.prices[fcKey] || 0;
+                                var fcCost = fuelCalcRows[fc].quantity * fcPrice;
+                                totalCost += fcCost;
+                                var fcIsHfuel = fuelCalcRows[fc].name === HFUEL_ITEM;
+                                html += '<div class="calc-item-row">';
+                                html += '<span class="calc-item-name calc-item-alt">' + escapeHtml(prettifyName(fuelCalcRows[fc].name));
+                                if (fcIsHfuel) html += ' <span class="hfuel-half-tag">(\u00BD)</span>';
+                                html += ' <span class="calc-item-qty">x' + formatNumber(fuelCalcRows[fc].quantity) + (bFactor < 1 ? ' <span class="calc-bonus-tag">(-' + Math.round((1-bFactor)*100) + '%)</span>' : '') + '</span></span>';
+                                html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + fcKey + '" value="' + (fcPrice || '') + '" min="0" step="any" placeholder="0">';
+                                html += '</div>';
+                            }
+                        } else {
+                            var aKey = 'alt_' + j;
+                            var aPrice = cd.prices[aKey] || 0;
+                            var adjAltQty = Math.round(a.quantity * bFactor * mult);
+                            var aLineCost = adjAltQty * aPrice;
+                            totalCost += aLineCost;
+                            var altNames = a.alternatives.map(function(x) { return prettifyName(x); }).join(' / ');
+                            html += '<div class="calc-item-row">';
+                            html += '<span class="calc-item-name calc-item-alt">' + escapeHtml(altNames) + ' <span class="calc-item-qty">x' + formatNumber(adjAltQty) + (bFactor < 1 ? ' <span class="calc-bonus-tag">(-' + Math.round((1-bFactor)*100) + '%)</span>' : '') + '</span></span>';
+                            html += '<input type="number" class="calc-input" data-calc-price="' + recipeIdx + '" data-calc-key="' + aKey + '" value="' + (aPrice || '') + '" min="0" step="any" placeholder="0">';
+                            html += '</div>';
+                        }
                     }
                 }
                 html += '</div>';
@@ -290,6 +335,7 @@
             html += '<div class="calc-results" data-calc-results="' + recipeIdx + '">';
             html += calcResultsHTML(dCost, dRevenue, dProfit, profitCls, marginStr);
             html += '</div>';
+            html += '<button class="calc-download-btn" data-download-idx="' + recipeIdx + '" title="Download as ODS spreadsheet">&#11015; Download ODS</button>';
             html += '</div>';
         }
         html += '</div>';
@@ -331,7 +377,15 @@
         }
         if (recipe.consumedAlt) {
             for (var j = 0; j < recipe.consumedAlt.length; j++) {
-                totalCost += Math.round(recipe.consumedAlt[j].quantity * bonus * mult) * (cd.prices['alt_' + j] || 0);
+                var altE = recipe.consumedAlt[j];
+                var fuelR = getFuelAltDisplay(altE, bonus, mult);
+                if (fuelR) {
+                    for (var fci = 0; fci < fuelR.length; fci++) {
+                        totalCost += fuelR[fci].quantity * (cd.prices['alt_' + j + '_' + fci] || 0);
+                    }
+                } else {
+                    totalCost += Math.round(altE.quantity * bonus * mult) * (cd.prices['alt_' + j] || 0);
+                }
             }
         }
         var totalRevenue = 0;
@@ -413,10 +467,20 @@
             altHTML = '<table class="materials-table"><thead><tr><th>Alternative Materials (pick one)</th><th style="text-align:right">Qty</th></tr></thead><tbody>';
             for (var j = 0; j < recipe.consumedAlt.length; j++) {
                 var a = recipe.consumedAlt[j];
-                var names = a.alternatives.map(function(x) { return prettifyName(x); }).join(' OR ');
-                var adjAltQty = Math.floor(a.quantity * affiliationBonus * mult);
-                altHTML += '<tr><td class="item-alt">' + escapeHtml(names) + '</td>' +
-                    '<td class="item-qty">' + formatNumber(adjAltQty) + '</td></tr>';
+                var fuelRows = getFuelAltDisplay(a, affiliationBonus, mult);
+                if (fuelRows) {
+                    for (var fr = 0; fr < fuelRows.length; fr++) {
+                        var isHfuel = fuelRows[fr].name === HFUEL_ITEM;
+                        altHTML += '<tr><td class="item-alt">' + escapeHtml(prettifyName(fuelRows[fr].name));
+                        if (isHfuel) altHTML += ' <span class="hfuel-half-tag">(\u00BD)</span>';
+                        altHTML += '</td><td class="item-qty">' + formatNumber(fuelRows[fr].quantity) + '</td></tr>';
+                    }
+                } else {
+                    var names = a.alternatives.map(function(x) { return prettifyName(x); }).join(' OR ');
+                    var adjAltQty = Math.floor(a.quantity * affiliationBonus * mult);
+                    altHTML += '<tr><td class="item-alt">' + escapeHtml(names) + '</td>' +
+                        '<td class="item-qty">' + formatNumber(adjAltQty) + '</td></tr>';
+                }
             }
             altHTML += '</tbody></table>';
         }
@@ -545,6 +609,12 @@
                 if (!r.affiliations || !r.affiliations.some(function(a) { return a.faction === factionFilter; })) return false;
             }
 
+            // Restricted recipes: only show when a faction with a listed bonus is selected
+            if (r.restricted) {
+                if (!factionFilter || factionFilter === 'none') return false;
+                if (!r.affiliations || !r.affiliations.some(function(a) { return a.faction === factionFilter; })) return false;
+            }
+
             return true;
         });
 
@@ -595,6 +665,261 @@
         }
 
         document.getElementById('total-count').textContent = siteData.recipes.length;
+    }
+
+    // Generate ODS (OpenDocument Spreadsheet) file for a recipe calculation
+    function generateODS(recipeIdx) {
+        var recipe = filteredRecipes[recipeIdx];
+        if (!recipe) return;
+        var cd = calcData[recipeIdx] || { prices: {} };
+        var factionFilter = document.getElementById('faction-filter').value;
+        var is24h = !!dailyModeCards[recipeIdx];
+        var mult = 1;
+        if (is24h && recipe.cookingRate) {
+            var m24 = get24hMultiplier(recipe, factionFilter);
+            if (m24 !== null) mult = m24;
+        }
+        var bonus = 1;
+        if (factionFilter && factionFilter !== 'none' && recipe.affiliations) {
+            for (var af = 0; af < recipe.affiliations.length; af++) {
+                if (recipe.affiliations[af].faction === factionFilter) {
+                    bonus = recipe.affiliations[af].bonus;
+                    break;
+                }
+            }
+        }
+
+        // Build rows: [name, qty, price, lineTotal]
+        var consumedRows = [];
+        var producedRows = [];
+
+        if (recipe.consumed) {
+            for (var i = 0; i < recipe.consumed.length; i++) {
+                var c = recipe.consumed[i];
+                var qty = Math.round(c.quantity * bonus * mult);
+                var price = cd.prices['buy_' + i] || 0;
+                consumedRows.push([prettifyName(c.item), qty, price, qty * price]);
+            }
+        }
+        if (recipe.consumedAlt) {
+            for (var j = 0; j < recipe.consumedAlt.length; j++) {
+                var a = recipe.consumedAlt[j];
+                var fuelR = getFuelAltDisplay(a, bonus, mult);
+                if (fuelR) {
+                    for (var fci = 0; fci < fuelR.length; fci++) {
+                        var fp = cd.prices['alt_' + j + '_' + fci] || 0;
+                        consumedRows.push([prettifyName(fuelR[fci].name), fuelR[fci].quantity, fp, fuelR[fci].quantity * fp]);
+                    }
+                } else {
+                    var aq = Math.round(a.quantity * bonus * mult);
+                    var ap = cd.prices['alt_' + j] || 0;
+                    var altLabel = a.alternatives.map(function(x) { return prettifyName(x); }).join(' / ');
+                    consumedRows.push([altLabel, aq, ap, aq * ap]);
+                }
+            }
+        }
+        if (recipe.producedItems) {
+            for (var k = 0; k < recipe.producedItems.length; k++) {
+                var p = recipe.producedItems[k];
+                var pq = Math.round(p.quantity * mult);
+                var pp = cd.prices['sell_' + k] || 0;
+                producedRows.push([prettifyName(p.item), pq, pp, pq * pp]);
+            }
+        }
+
+        var totalCost = consumedRows.reduce(function(s, r) { return s + r[3]; }, 0);
+        var totalRevenue = producedRows.reduce(function(s, r) { return s + r[3]; }, 0);
+        var profit = totalRevenue - totalCost;
+
+        // Build ODS XML content
+        function xmlEsc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+        function textCell(v) { return '<table:table-cell office:value-type="string"><text:p>' + xmlEsc(v) + '</text:p></table:table-cell>'; }
+        function numCell(v) { return '<table:table-cell office:value-type="float" office:value="' + v + '"><text:p>' + v + '</text:p></table:table-cell>'; }
+        function emptyCell() { return '<table:table-cell/>'; }
+
+        var rows = [];
+        // Title
+        rows.push('<table:table-row>' + textCell(recipe.infotext + (is24h ? ' (24h)' : ' (per batch)')) + emptyCell() + emptyCell() + emptyCell() + '</table:table-row>');
+        rows.push('<table:table-row>' + emptyCell() + emptyCell() + emptyCell() + emptyCell() + '</table:table-row>');
+
+        // Consumed header
+        rows.push('<table:table-row>' + textCell('Consumed Materials') + textCell('Quantity') + textCell('Price Each') + textCell('Line Total') + '</table:table-row>');
+        for (var ci = 0; ci < consumedRows.length; ci++) {
+            rows.push('<table:table-row>' + textCell(consumedRows[ci][0]) + numCell(consumedRows[ci][1]) + numCell(consumedRows[ci][2]) + numCell(consumedRows[ci][3]) + '</table:table-row>');
+        }
+        rows.push('<table:table-row>' + emptyCell() + emptyCell() + emptyCell() + emptyCell() + '</table:table-row>');
+
+        // Produced header
+        rows.push('<table:table-row>' + textCell('Produced Items') + textCell('Quantity') + textCell('Price Each') + textCell('Line Total') + '</table:table-row>');
+        for (var pi = 0; pi < producedRows.length; pi++) {
+            rows.push('<table:table-row>' + textCell(producedRows[pi][0]) + numCell(producedRows[pi][1]) + numCell(producedRows[pi][2]) + numCell(producedRows[pi][3]) + '</table:table-row>');
+        }
+        rows.push('<table:table-row>' + emptyCell() + emptyCell() + emptyCell() + emptyCell() + '</table:table-row>');
+
+        // Summary
+        rows.push('<table:table-row>' + textCell('Total Cost') + emptyCell() + emptyCell() + numCell(Math.round(totalCost)) + '</table:table-row>');
+        rows.push('<table:table-row>' + textCell('Total Revenue') + emptyCell() + emptyCell() + numCell(Math.round(totalRevenue)) + '</table:table-row>');
+        rows.push('<table:table-row>' + textCell('Profit') + emptyCell() + emptyCell() + numCell(Math.round(profit)) + '</table:table-row>');
+        if (totalCost > 0) {
+            rows.push('<table:table-row>' + textCell('Margin') + emptyCell() + emptyCell() + textCell(((profit / totalCost) * 100).toFixed(1) + '%') + '</table:table-row>');
+        }
+
+        var contentXml = '<?xml version="1.0" encoding="UTF-8"?>' +
+            '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" ' +
+            'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" ' +
+            'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" ' +
+            'office:version="1.2">' +
+            '<office:body><office:spreadsheet>' +
+            '<table:table table:name="Calculation">' +
+            '<table:table-column table:number-columns-repeated="4"/>' +
+            rows.join('') +
+            '</table:table>' +
+            '</office:spreadsheet></office:body></office:document-content>';
+
+        var metaXml = '<?xml version="1.0" encoding="UTF-8"?>' +
+            '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" ' +
+            'xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.2">' +
+            '<office:meta><meta:generator>DiscoveryRecipeCalculator</meta:generator></office:meta>' +
+            '</office:document-meta>';
+
+        var stylesXml = '<?xml version="1.0" encoding="UTF-8"?>' +
+            '<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.2">' +
+            '</office:document-styles>';
+
+        var manifestXml = '<?xml version="1.0" encoding="UTF-8"?>' +
+            '<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">' +
+            '<manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/>' +
+            '<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>' +
+            '<manifest:file-entry manifest:full-path="meta.xml" manifest:media-type="text/xml"/>' +
+            '<manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/>' +
+            '</manifest:manifest>';
+
+        var mimetypeStr = 'application/vnd.oasis.opendocument.spreadsheet';
+
+        // Build ZIP using minimal ZIP creation (no library needed)
+        var zip = buildOdsZip(mimetypeStr, contentXml, metaXml, stylesXml, manifestXml);
+        var blob = new Blob([zip], { type: 'application/vnd.oasis.opendocument.spreadsheet' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = (recipe.infotext || 'calculation').replace(/[^a-zA-Z0-9_ -]/g, '') + '.ods';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    // Minimal ZIP builder for ODS files
+    function buildOdsZip(mimetype, contentXml, metaXml, stylesXml, manifestXml) {
+        var files = [
+            { name: 'mimetype', data: strToU8(mimetype), compress: false },
+            { name: 'content.xml', data: strToU8(contentXml), compress: false },
+            { name: 'meta.xml', data: strToU8(metaXml), compress: false },
+            { name: 'styles.xml', data: strToU8(stylesXml), compress: false },
+            { name: 'META-INF/manifest.xml', data: strToU8(manifestXml), compress: false }
+        ];
+
+        var localHeaders = [];
+        var centralHeaders = [];
+        var offset = 0;
+
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            var nameBytes = strToU8(f.name);
+            var crc = crc32(f.data);
+            var localHeader = new Uint8Array(30 + nameBytes.length + f.data.length);
+            var dv = new DataView(localHeader.buffer);
+            dv.setUint32(0, 0x04034b50, true); // local file header sig
+            dv.setUint16(4, 20, true); // version needed
+            dv.setUint16(6, 0, true); // flags
+            dv.setUint16(8, 0, true); // compression: stored
+            dv.setUint16(10, 0, true); // mod time
+            dv.setUint16(12, 0, true); // mod date
+            dv.setUint32(14, crc, true); // crc-32
+            dv.setUint32(18, f.data.length, true); // compressed size
+            dv.setUint32(22, f.data.length, true); // uncompressed size
+            dv.setUint16(26, nameBytes.length, true); // file name length
+            dv.setUint16(28, 0, true); // extra field length
+            localHeader.set(nameBytes, 30);
+            localHeader.set(f.data, 30 + nameBytes.length);
+            localHeaders.push(localHeader);
+
+            // Central directory entry
+            var central = new Uint8Array(46 + nameBytes.length);
+            var cdv = new DataView(central.buffer);
+            cdv.setUint32(0, 0x02014b50, true); // central dir sig
+            cdv.setUint16(4, 20, true); // version made by
+            cdv.setUint16(6, 20, true); // version needed
+            cdv.setUint16(8, 0, true); // flags
+            cdv.setUint16(10, 0, true); // compression
+            cdv.setUint16(12, 0, true); // mod time
+            cdv.setUint16(14, 0, true); // mod date
+            cdv.setUint32(16, crc, true);
+            cdv.setUint32(20, f.data.length, true);
+            cdv.setUint32(24, f.data.length, true);
+            cdv.setUint16(28, nameBytes.length, true);
+            cdv.setUint16(30, 0, true); // extra length
+            cdv.setUint16(32, 0, true); // comment length
+            cdv.setUint16(34, 0, true); // disk
+            cdv.setUint16(36, 0, true); // internal attrs
+            cdv.setUint32(38, 0, true); // external attrs
+            cdv.setUint32(42, offset, true); // local header offset
+            central.set(nameBytes, 46);
+            centralHeaders.push(central);
+
+            offset += localHeader.length;
+        }
+
+        var centralSize = centralHeaders.reduce(function(s, c) { return s + c.length; }, 0);
+        var eocd = new Uint8Array(22);
+        var edv = new DataView(eocd.buffer);
+        edv.setUint32(0, 0x06054b50, true); // end of central dir sig
+        edv.setUint16(4, 0, true); // disk
+        edv.setUint16(6, 0, true); // disk with central dir
+        edv.setUint16(8, files.length, true); // entries on disk
+        edv.setUint16(10, files.length, true); // total entries
+        edv.setUint32(12, centralSize, true); // central dir size
+        edv.setUint32(16, offset, true); // central dir offset
+        edv.setUint16(20, 0, true); // comment length
+
+        var totalLen = offset + centralSize + 22;
+        var result = new Uint8Array(totalLen);
+        var pos = 0;
+        for (var li = 0; li < localHeaders.length; li++) {
+            result.set(localHeaders[li], pos);
+            pos += localHeaders[li].length;
+        }
+        for (var ci = 0; ci < centralHeaders.length; ci++) {
+            result.set(centralHeaders[ci], pos);
+            pos += centralHeaders[ci].length;
+        }
+        result.set(eocd, pos);
+        return result;
+    }
+
+    function strToU8(str) {
+        var encoder = new TextEncoder();
+        return encoder.encode(str);
+    }
+
+    function crc32(data) {
+        var table = crc32.table;
+        if (!table) {
+            table = new Uint32Array(256);
+            for (var i = 0; i < 256; i++) {
+                var c = i;
+                for (var j = 0; j < 8; j++) {
+                    c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                }
+                table[i] = c;
+            }
+            crc32.table = table;
+        }
+        var crc = 0xFFFFFFFF;
+        for (var k = 0; k < data.length; k++) {
+            crc = table[(crc ^ data[k]) & 0xFF] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xFFFFFFFF) >>> 0;
     }
 
     // Build index: craftType -> list of recipes with that craft type
@@ -723,6 +1048,10 @@
                     });
                 })();
                 document.getElementById('faction-only-filter').addEventListener('change', applyFilters);
+                document.getElementById('hfuel-half-toggle').addEventListener('change', function() {
+                    hFuelHalf = this.checked;
+                    applyFilters();
+                });
 
                 // Toggle button delegation
                 document.getElementById('recipe-list').addEventListener('click', function(e) {
@@ -773,6 +1102,14 @@
                     if (!calcData[idx]) calcData[idx] = { prices: {}, open: true };
                     calcData[idx].prices[key] = parseFloat(inp.value) || 0;
                     updateCalcResults(idx);
+                });
+
+                // ODS download button delegation
+                document.getElementById('recipe-list').addEventListener('click', function(e) {
+                    var dlBtn = e.target.closest('.calc-download-btn');
+                    if (!dlBtn) return;
+                    var idx = parseInt(dlBtn.getAttribute('data-download-idx'), 10);
+                    generateODS(idx);
                 });
             })
             .catch(function(err) {

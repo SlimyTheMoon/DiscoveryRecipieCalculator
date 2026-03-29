@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 const indexHTML = `<!DOCTYPE html>
 <html lang="en">
@@ -51,6 +51,13 @@ const indexHTML = `<!DOCTYPE html>
                         <input type="checkbox" id="faction-only-filter"> Only with bonus
                     </label>
                 </div>
+            </div>
+
+            <div class="filter-group">
+                <label class="hfuel-toggle-label">
+                    <input type="checkbox" id="hfuel-half-toggle"> H-Fuel &frac12; mode
+                </label>
+                <span class="hfuel-hint">Half H-Fuel units when using Mox/Promethene</span>
             </div>
 
             <div class="stats" id="stats-bar">

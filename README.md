@@ -11,8 +11,11 @@ A static site generator and crafting calculator for [Discovery Freelancer](https
 - Filter by **source** (Items / Modules), **category**, and **free-text search**
 - **Faction affiliation bonus** — searchable autocomplete to select a faction, see adjusted material quantities and cooking times
 - **"Only with bonus" filter** — when a faction is selected, toggle to show only recipes that faction has a bonus on
+- **Restricted recipe visibility** — restricted recipes are hidden by default and only shown when a faction listed in their affiliation bonuses is selected
 - **Per Batch / 24 Hours toggle** — switch between per-batch and 24-hour production views (items only, not modules)
+- **H-Fuel ½ mode** — toggle to calculate H-Fuel at half quantity when recipes use Mox, Promethene, and H-Fuel as fuel alternatives, reflecting actual in-game fuel consumption
 - **Profit calculator** — per-item buy/sell price inputs with real-time cost, revenue, and margin calculation; updates with batch/24h mode and affiliation bonuses
+- **ODS spreadsheet download** — export any profit calculation as an ODS file (opens in LibreOffice Calc and Excel)
 - **Cooking time calculation** — `total consumed volume ÷ cooking rate (vol/min)` with formula breakdown and material proportion bar
 - **Real commodity names** — item names sourced from game data (`select_equip.ini`) instead of auto-generated from internal nicknames
 - Supports consumed items, dynamic alternatives (OR choices), and catalysts

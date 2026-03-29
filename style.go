@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 const styleCSS = `/* Discovery Recipe Calculator */
 :root {
@@ -655,6 +655,54 @@ select:focus, input:focus {
 .calc-val-rev { color: var(--green); }
 .calc-profit-pos { color: var(--green); font-weight: 600; }
 .calc-profit-neg { color: var(--red); font-weight: 600; }
+
+/* H-Fuel half toggle */
+.hfuel-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    padding-top: 0.3rem;
+}
+
+.hfuel-toggle-label input[type="checkbox"] {
+    accent-color: var(--orange);
+    cursor: pointer;
+}
+
+.hfuel-hint {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.hfuel-half-tag {
+    color: var(--orange);
+    font-weight: 600;
+    font-size: 0.75em;
+}
+
+/* ODS download button */
+.calc-download-btn {
+    display: inline-block;
+    margin-top: 0.5rem;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--accent);
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.calc-download-btn:hover {
+    border-color: var(--accent);
+    background: rgba(88,166,255,0.1);
+}
 
 /* Footer */
 footer {
