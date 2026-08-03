@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 const appJS = `// Discovery Recipe Calculator - Client-side rendering and calculation
 (function() {
@@ -59,13 +59,14 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
     }
 
     // Calculate cooking time details: sum of consumed (quantity * volume) / cooking_rate
-    function calcCookingDetails(recipe, affiliationBonus) {
+    // Affiliation bonuses reduce material quantities only — the cooking time itself
+    // is always computed from the base material volumes.
+    function calcCookingDetails(recipe) {
         if (!recipe.cookingRate || recipe.cookingRate === 0) {
-            return { totalVolume: 0, rate: 0, baseTime: null, adjustedTime: null, bonus: null, items: [] };
+            return { totalVolume: 0, rate: 0, baseTime: null, items: [] };
         }
         var totalVolume = 0;
         var items = [];
-        var bonus = affiliationBonus || 1;
         var volumes = (siteData && siteData.volumes) || {};
 
         if (recipe.consumed) {
@@ -94,14 +95,11 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         }
 
         var baseTime = (totalVolume / recipe.cookingRate) * 60;
-        var adjustedTime = ((totalVolume * bonus) / recipe.cookingRate) * 60;
 
         return {
             totalVolume: totalVolume,
             rate: recipe.cookingRate,
             baseTime: baseTime,
-            adjustedTime: bonus < 1 ? adjustedTime : null,
-            bonus: bonus < 1 ? bonus : null,
             items: items
         };
     }
@@ -120,20 +118,9 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
     }
 
     // Build the cooking time breakdown section HTML
-    function renderCookingSection(recipe, selectedFaction) {
-        var bonus = 1;
-        var factionName = '';
-        if (selectedFaction && selectedFaction !== 'none' && recipe.affiliations) {
-            for (var n = 0; n < recipe.affiliations.length; n++) {
-                if (recipe.affiliations[n].faction === selectedFaction) {
-                    bonus = recipe.affiliations[n].bonus;
-                    factionName = (siteData.factions && siteData.factions[selectedFaction]) || selectedFaction;
-                    break;
-                }
-            }
-        }
-
-        var details = calcCookingDetails(recipe, bonus);
+    // Note: affiliation bonuses reduce material quantities only, never the cooking time.
+    function renderCookingSection(recipe) {
+        var details = calcCookingDetails(recipe);
         if (details.baseTime === null) return '';
 
         var html = '<div class="cooking-section">';
@@ -142,10 +129,6 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         // Main time display
         html += '<div class="cooking-time-display">';
         html += '<span class="cooking-time-value">' + formatTime(details.baseTime) + '</span>';
-        if (details.adjustedTime !== null) {
-            html += '<span class="cooking-arrow">&rarr;</span>';
-            html += '<span class="cooking-time-adjusted">' + formatTime(details.adjustedTime) + '</span>';
-        }
         html += '</div>';
 
         // Formula
@@ -156,15 +139,6 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         html += '<span class="cooking-op">=</span>';
         html += '<span>' + formatTime(details.baseTime) + '</span>';
         html += '</div>';
-
-        if (details.adjustedTime !== null) {
-            var savings = details.baseTime - details.adjustedTime;
-            var pct = Math.round((1 - bonus) * 100);
-            html += '<div class="cooking-bonus">';
-            html += escapeHtml(factionName) + ' bonus: -' + pct + '% materials ';
-            html += '(saves ' + formatTime(savings) + ')';
-            html += '</div>';
-        }
 
         // Per-item time bar
         if (details.items.length > 0 && details.totalVolume > 0) {
@@ -219,20 +193,12 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
     }
 
     // Compute 24h multiplier for a recipe
-    function get24hMultiplier(recipe, selectedFaction) {
-        var bonus = 1;
-        if (selectedFaction && selectedFaction !== 'none' && recipe.affiliations) {
-            for (var n = 0; n < recipe.affiliations.length; n++) {
-                if (recipe.affiliations[n].faction === selectedFaction) {
-                    bonus = recipe.affiliations[n].bonus;
-                    break;
-                }
-            }
-        }
-        var details = calcCookingDetails(recipe, bonus);
+    // Cooking time is fixed (bonuses reduce materials only), so batches per 24h
+    // are always derived from the base cooking time.
+    function get24hMultiplier(recipe) {
+        var details = calcCookingDetails(recipe);
         if (details.baseTime === null || details.baseTime === 0) return null;
-        var cookTime = details.adjustedTime !== null ? details.adjustedTime : details.baseTime;
-        return (24 * 60 * 60) / cookTime;
+        return (24 * 60 * 60) / details.baseTime;
     }
 
     function escapeHtml(text) {
@@ -363,7 +329,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         var factionFilter = document.getElementById('faction-filter').value;
         var mult = 1;
         if (is24h && recipe.cookingRate) {
-            var m24 = get24hMultiplier(recipe, factionFilter);
+            var m24 = get24hMultiplier(recipe);
             if (m24 !== null) mult = m24;
         }
         var bonus = 1;
@@ -422,7 +388,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         var has24hToggle = false;
 
         if (recipe.source !== 'modules' && recipe.cookingRate && recipe.cookingRate > 0) {
-            var m24 = get24hMultiplier(recipe, selectedFaction);
+            var m24 = get24hMultiplier(recipe);
             if (m24 !== null) {
                 has24hToggle = true;
                 batchesIn24h = m24;
@@ -438,9 +404,8 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
             toggleHTML += '<button class="toggle-btn' + (is24h ? ' active' : '') + '" data-idx="' + recipeIdx + '" data-mode="daily">24 Hours</button>';
             toggleHTML += '</div>';
             if (is24h) {
-                var details = calcCookingDetails(recipe, 1);
-                var cookTime = details.adjustedTime !== null ? details.adjustedTime : details.baseTime;
-                toggleHTML += '<div class="daily-info">' + formatNumber(Math.floor(batchesIn24h)) + ' batches &mdash; one every ' + formatTime(cookTime) + '</div>';
+                var details = calcCookingDetails(recipe);
+                toggleHTML += '<div class="daily-info">' + formatNumber(Math.floor(batchesIn24h)) + ' batches &mdash; one every ' + formatTime(details.baseTime) + '</div>';
             }
         }
 
@@ -563,7 +528,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         }
 
         // Cooking time section
-        var cookingSectionHTML = renderCookingSection(recipe, selectedFaction);
+        var cookingSectionHTML = renderCookingSection(recipe);
 
         // Profit calculator section (not for modules)
         var calcSectionHTML = recipe.source !== 'modules' ? renderCalcSection(recipe, recipeIdx, mult, affiliationBonus) : '';
@@ -681,7 +646,7 @@ const appJS = `// Discovery Recipe Calculator - Client-side rendering and calcul
         var is24h = !!dailyModeCards[recipeIdx];
         var mult = 1;
         if (is24h && recipe.cookingRate) {
-            var m24 = get24hMultiplier(recipe, factionFilter);
+            var m24 = get24hMultiplier(recipe);
             if (m24 !== null) mult = m24;
         }
         var bonus = 1;

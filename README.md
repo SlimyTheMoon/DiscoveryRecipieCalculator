@@ -9,7 +9,7 @@ A static site generator and crafting calculator for [Discovery Freelancer](https
 - Parses `base_recipe_items.cfg` and `base_recipe_modules.cfg` from the `sources/` directory
 - Generates a static site with all recipes as interactive, filterable cards
 - Filter by **source** (Items / Modules), **category**, and **free-text search**
-- **Faction affiliation bonus** — searchable autocomplete to select a faction, see adjusted material quantities and cooking times
+- **Faction affiliation bonus** — searchable autocomplete to select a faction, see adjusted material quantities
 - **"Only with bonus" filter** — when a faction is selected, toggle to show only recipes that faction has a bonus on
 - **Restricted recipe visibility** — restricted recipes are hidden by default and only shown when a faction listed in their affiliation bonuses is selected
 - **Per Batch / 24 Hours toggle** — switch between per-batch and 24-hour production views (items only, not modules)
@@ -118,4 +118,4 @@ Cooking time is calculated as:
 
 $$\text{Time (seconds)} = \frac{\sum (\text{quantity} \times \text{volume per unit})}{\text{Cooking rate (vol/min)}} \times 60$$
 
-Each consumed item's quantity is multiplied by its volume (from `select_equip.ini`) to get the total volume. When a faction affiliation bonus applies, consumed material quantities are reduced by the bonus factor before the calculation, resulting in a shorter cook time.
+Each consumed item's quantity is multiplied by its volume (from `select_equip.ini`) to get the total volume. Faction affiliation bonuses reduce consumed material quantities only — the cooking time itself is always based on the base material volumes and is never shortened by a bonus.
